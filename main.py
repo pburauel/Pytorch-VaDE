@@ -13,7 +13,7 @@ from preprocess import get_mnist
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=299,
+    parser.add_argument("--epochs", type=int, default=20,
                         help="number of iterations")
     parser.add_argument("--patience", type=int, default=50, 
                         help="Patience for Early Stopping")
