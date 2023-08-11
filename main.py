@@ -1,9 +1,15 @@
+
+
+import os
+os.chdir('C:/Users/pfbur/Box/projects/CFL-GIP/VaDE_code/Pytorch-VaDE')
+
 import argparse 
 import torch.utils.data
 from torchvision import datasets, transforms
 
 from train import TrainerVaDE
 from preprocess import get_mnist
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
