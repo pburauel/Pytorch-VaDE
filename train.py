@@ -4,8 +4,8 @@ import numpy as np
 from torch import optim
 import torch.nn.functional as F
 from sklearn.mixture import GaussianMixture
-from sklearn.utils.linear_assignment_ import linear_assignment
-
+# from sklearn.utils.linear_assignment_ import linear_assignment # https://stackoverflow.com/questions/62390517/no-module-named-sklearn-utils-linear-assignment
+from scipy.optimize import linear_sum_assignment# as linear_assignment
 from models import Autoencoder, VaDE
 
 
@@ -129,15 +129,15 @@ class TrainerVaDE:
 
     def compute_loss(self, x, x_hat, mu, log_var, z):
         p_c = self.VaDE.pi_prior
-        gamma = self.compute_gamma(z, p_c)
+        gamma = self.compute_gamma(z, p_c) # gamma is q_c_given_x = p_c_given_x
 
-        log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum')
+        log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') # why binary cross entropy, I guess this should be replaced when using a continuous x model?!
         h = log_var.exp().unsqueeze(1) + (mu.unsqueeze(1) - self.VaDE.mu_prior).pow(2)
         h = torch.sum(self.VaDE.log_var_prior + h / self.VaDE.log_var_prior.exp(), dim=2)
-        log_p_z_given_c = 0.5 * torch.sum(gamma * h)
-        log_p_c = torch.sum(gamma * torch.log(p_c + 1e-9))
+        log_p_z_given_c = 0.5 * torch.sum(gamma * h) # this is where number of gaussian clusters enters
+        log_p_c = torch.sum(gamma * torch.log(p_c + 1e-9)) # this is the update of p_c
         log_q_c_given_x = torch.sum(gamma * torch.log(gamma + 1e-9))
-        log_q_z_given_x = 0.5 * torch.sum(1 + log_var)
+        log_q_z_given_x = 0.5 * torch.sum(1 + log_var) # ?
 
         loss = log_p_x_given_z + log_p_z_given_c - log_p_c +  log_q_c_given_x - log_q_z_given_x
         loss /= x.size(0)
@@ -148,7 +148,7 @@ class TrainerVaDE:
         h += self.VaDE.log_var_prior
         h += torch.Tensor([np.log(np.pi*2)]).to(self.device)
         p_z_c = torch.exp(torch.log(p_c + 1e-9).unsqueeze(0) - 0.5 * torch.sum(h, dim=2)) + 1e-9
-        gamma = p_z_c / torch.sum(p_z_c, dim=1, keepdim=True)
+        gamma = p_z_c / torch.sum(p_z_c, dim=1, keepdim=True) # this is equation 16 in the paper and the standard proba of a gaussian
         return gamma
 
     def cluster_acc(self, real, pred):
@@ -156,8 +156,9 @@ class TrainerVaDE:
         w = np.zeros((D,D), dtype=np.int64)
         for i in range(pred.size):
             w[pred[i], real[i]] += 1
-        ind = linear_assignment(w.max() - w)
-        return sum([w[i,j] for i,j in ind])*1.0/pred.size*100, w
+        ind = linear_sum_assignment(w.max() - w)
+        total_cost = w[ind[0], ind[1]].sum()
+        return total_cost * 1.0 / pred.size * 100, w # chat gpt correction!
 
 
 """

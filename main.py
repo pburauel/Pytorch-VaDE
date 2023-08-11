@@ -7,7 +7,7 @@ from preprocess import get_mnist
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=300,
+    parser.add_argument("--epochs", type=int, default=299,
                         help="number of iterations")
     parser.add_argument("--patience", type=int, default=50, 
                         help="Patience for Early Stopping")
@@ -26,7 +26,7 @@ if __name__ == '__main__':
     dataloader = get_mnist(batch_size=args.batch_size)
     
     vade = TrainerVaDE(args, device, dataloader)
-    #if args.pretrain==True:
-    #    vade.pretrain()
+    # if args.pretrain==True:
+    #     vade.pretrain()
     vade.train()
 
