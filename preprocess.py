@@ -14,12 +14,12 @@ def get_mnist(data_dir='./data/mnist/',batch_size=128):
 
 
     pca = PCA(n_components=784)
-    x2 = torch.from_numpy(pca.fit_transform(x))
+    x2 = torch.from_numpy(pca.fit_transform(x)).float()
 
-    dataset = dict()
-    dataset['x'] = x
-    dataset['y'] = y
+    # dataset = dict()
+    # dataset['x'] = x
+    # dataset['y'] = y
 
-    dataloader=DataLoader(TensorDataset(x,y), batch_size=batch_size, 
+    dataloader=DataLoader(TensorDataset(x2,y), batch_size=batch_size, 
                           shuffle=True, num_workers=4)
     return dataloader
