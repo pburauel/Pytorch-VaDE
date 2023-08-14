@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader, TensorDataset
 
 from sklearn.decomposition import PCA
 
+from global_settings import *
 
 def get_mnist(data_dir='./data/mnist/',batch_size=128):
     train = MNIST(root=data_dir, train=True, download=True)
@@ -13,8 +14,9 @@ def get_mnist(data_dir='./data/mnist/',batch_size=128):
     y = torch.cat([train.targets, test.targets], 0)
 
 
-    pca = PCA(n_components=784)
+    pca = PCA(n_components=in_dim)
     x2 = torch.from_numpy(pca.fit_transform(x)).float()
+    # pca.explained_variance_ratio_.sum()
 
     # dataset = dict()
     # dataset['x'] = x

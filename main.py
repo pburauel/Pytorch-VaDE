@@ -1,5 +1,3 @@
-
-
 import os
 os.chdir('C:/Users/pfbur/Box/projects/CFL-GIP/VaDE_code/Pytorch-VaDE')
 
