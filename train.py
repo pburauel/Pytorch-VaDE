@@ -36,7 +36,7 @@ class TrainerVaDE:
         self.autoencoder.apply(weights_init_normal) #intializing weights using normal distribution.
         self.autoencoder.train()
         print('Training the autoencoder...')
-        for epoch in range(3): # used to be range(30)
+        for epoch in range(self.args.epochs_autoencoder): # used to be range(30)
             total_loss = 0
             for x, _ in self.dataloader:
                 optimizer.zero_grad()
