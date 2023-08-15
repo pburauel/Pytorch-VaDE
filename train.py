@@ -134,6 +134,7 @@ class TrainerVaDE:
         gamma = self.compute_gamma(z, p_c) # gamma is q_c_given_x = p_c_given_x
 
         log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') # why binary cross entropy, I guess this should be replaced when using a continuous x model?!
+        # I guess this is ok because the decoder spits out a sigmoid?!?! still dont know why that is happening tho
         h = log_var.exp().unsqueeze(1) + (mu.unsqueeze(1) - self.VaDE.mu_prior).pow(2)
         h = torch.sum(self.VaDE.log_var_prior + h / self.VaDE.log_var_prior.exp(), dim=2)
         log_p_z_given_c = 0.5 * torch.sum(gamma * h) # this is where number of gaussian clusters enters

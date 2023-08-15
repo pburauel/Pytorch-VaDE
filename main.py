@@ -11,12 +11,12 @@ from preprocess import get_mnist
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=200, # original level = 300
+    parser.add_argument("--epochs", type=int, default=300, # original level = 300
                         help="number of iterations")
     parser.add_argument("--epochs_autoencoder", type=int, default=30, # original level = 30
                         help="number of iterations")
-    parser.add_argument("--dim_mnist", type=int, default=2,
-                        help="number of iterations")
+    parser.add_argument("--dim_mnist", type=int, default=20,
+                        help="number of dimensions of PCA used to dim-reduce MNIST")
     parser.add_argument("--patience", type=int, default=50, 
                         help="Patience for Early Stopping")
     parser.add_argument('--lr', type=float, default=2e-3,
