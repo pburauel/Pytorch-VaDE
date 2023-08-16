@@ -5,8 +5,6 @@ from torch.nn.parameter import Parameter
 
 from global_settings import *
 
-
-
 class VaDE(torch.nn.Module):
     def __init__(self, in_dim=in_dim, latent_dim=10, n_classes=10):
         super(VaDE, self).__init__()

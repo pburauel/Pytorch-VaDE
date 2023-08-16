@@ -1,5 +1,3 @@
-
-
 import os
 os.chdir('C:/Users/pfbur/Box/projects/CFL-GIP/VaDE_code/Pytorch-VaDE')
 
@@ -13,7 +11,9 @@ from preprocess import get_mnist
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=2,
+    parser.add_argument("--epochs", type=int, default=300, # original level = 300
+                        help="number of iterations")
+    parser.add_argument("--epochs_autoencoder", type=int, default=3, # original level = 30
                         help="number of iterations")
     parser.add_argument("--epochs_autoencoder", type=int, default=2,
                         help="number of iterations")    
@@ -23,13 +23,14 @@ if __name__ == '__main__':
                         help='learning rate')
     parser.add_argument("--batch_size", type=int, default=100, 
                         help="Batch size")
-    parser.add_argument('--pretrain', type=bool, default=True,
+    parser.add_argument('--pretrain', type=bool, default=False,
                         help='learning rate')
     parser.add_argument('--pretrained_path', type=str, default='weights/pretrained_parameter.pth',
                         help='Output path')
     args = parser.parse_args()
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cpu')
 
     dataloader = get_mnist(batch_size=args.batch_size)
     
