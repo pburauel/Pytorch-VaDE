@@ -34,7 +34,7 @@ class TrainerVaDE:
         self.autoencoder.apply(weights_init_normal) #intializing weights using normal distribution.
         self.autoencoder.train()
         print('Training the autoencoder...')
-        for epoch in range(3): # used to be range(30)
+        for epoch in range(self.args.epochs_autoencoder): # used to be range(30)
             total_loss = 0
             for x, _ in self.dataloader:
                 optimizer.zero_grad()
@@ -130,6 +130,11 @@ class TrainerVaDE:
     def compute_loss(self, x, x_hat, mu, log_var, z):
         p_c = self.VaDE.pi_prior
         gamma = self.compute_gamma(z, p_c) # gamma is q_c_given_x = p_c_given_x
+
+        print(f'min of x is {x.min()}')
+        print(f'max of x is {x.max()}')        
+        print(f'min of x_hat is {x_hat.min()}')
+        print(f'max of x_hat is {x_hat.max()}')
 
         log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') # why binary cross entropy, I guess this should be replaced when using a continuous x model?!
         h = log_var.exp().unsqueeze(1) + (mu.unsqueeze(1) - self.VaDE.mu_prior).pow(2)
