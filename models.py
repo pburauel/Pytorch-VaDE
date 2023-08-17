@@ -3,10 +3,12 @@ from torch import nn
 from torch.nn import functional as F
 from torch.nn.parameter import Parameter
 
+from global_settings import *
+
 
 
 class VaDE(torch.nn.Module):
-    def __init__(self, in_dim=784, latent_dim=10, n_classes=10):
+    def __init__(self, in_dim=in_dim, latent_dim=10, n_classes=10):
         super(VaDE, self).__init__()
 
         self.pi_prior = Parameter(torch.ones(n_classes)/n_classes)
@@ -20,7 +22,7 @@ class VaDE(torch.nn.Module):
         self.mu = nn.Linear(2048, latent_dim) #Latent mu
         self.log_var = nn.Linear(2048, latent_dim) #Latent logvar
 
-        self.fc4 = nn.Linear(latent_dim, 2048) 
+        self.fc4 = nn.Linear(latent_dim, 2048)
         self.fc5 = nn.Linear(2048, 512)
         self.fc6 = nn.Linear(512, 512)
         self.fc7 = nn.Linear(512, in_dim) #Decoder
@@ -50,7 +52,7 @@ class VaDE(torch.nn.Module):
 
 
 class Autoencoder(torch.nn.Module):
-    def __init__(self, in_dim=784, latent_dim=10):
+    def __init__(self, in_dim=in_dim, latent_dim=10):
         super(Autoencoder, self).__init__()
         self.fc1 = nn.Linear(in_dim, 512) #Encoder
         self.fc2 = nn.Linear(512, 512)
