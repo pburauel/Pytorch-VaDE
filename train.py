@@ -8,6 +8,8 @@ from sklearn.mixture import GaussianMixture
 from scipy.optimize import linear_sum_assignment# as linear_assignment
 from models import Autoencoder, VaDE
 
+from global_settings import *
+
 
 def weights_init_normal(m):
     classname = m.__class__.__name__
@@ -41,6 +43,7 @@ class TrainerVaDE:
                 x = x.to(self.device)
                 x_hat = self.autoencoder(x)
                 loss = F.binary_cross_entropy(x_hat, x, reduction='mean') # just reconstruction
+                # loss = F.mse_loss(x_hat, x, reduction='mean') # just reconstruction
                 loss.backward()
                 optimizer.step()
                 total_loss += loss.item()
@@ -55,7 +58,7 @@ class TrainerVaDE:
         the priors (pi, mu, var) of the VaDE model.
         """
         print('Fiting Gaussian Mixture Model...')
-        x = torch.cat([data[0] for data in self.dataloader]).view(-1, 784).to(self.device) #all x samples.
+        x = torch.cat([data[0] for data in self.dataloader]).view(-1, in_dim).to(self.device) #all x samples.
         z = self.autoencoder.encode(x)
         self.gmm = GaussianMixture(n_components=10, covariance_type='diag')
         self.gmm.fit(z.cpu().detach().numpy())

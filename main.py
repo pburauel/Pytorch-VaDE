@@ -13,9 +13,9 @@ from preprocess import get_mnist
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=1,
+    parser.add_argument("--epochs", type=int, default=300,
                         help="number of iterations")
-    parser.add_argument("--epochs_autoencoder", type=int, default=1,
+    parser.add_argument("--epochs_autoencoder", type=int, default=30,
                         help="number of epochs autoencoder")
     parser.add_argument("--patience", type=int, default=50, 
                         help="Patience for Early Stopping")
@@ -30,6 +30,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = 'cpu'
 
     dataloader = get_mnist(batch_size=args.batch_size)
     

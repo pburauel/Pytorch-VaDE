@@ -22,9 +22,9 @@ def get_mnist(data_dir='./data/mnist/',batch_size=128):
     
     x = torch.from_numpy(x2_scaled).float()
 
-    # dataset = dict()
-    # dataset['x'] = x
-    # dataset['y'] = y
+    dataset = dict()
+    dataset['x'] = x
+    dataset['y'] = y
 
     dataloader=DataLoader(TensorDataset(x,y), batch_size=batch_size, 
                           shuffle=True, num_workers=4)

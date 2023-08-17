@@ -15,17 +15,17 @@ class VaDE(torch.nn.Module):
         self.mu_prior = Parameter(torch.zeros(n_classes, latent_dim))
         self.log_var_prior = Parameter(torch.randn(n_classes, latent_dim))
         
-        self.fc1 = nn.Linear(in_dim, 512) #Encoder
-        self.fc2 = nn.Linear(512, 512)
-        self.fc3 = nn.Linear(512, 2048) 
+        self.fc1 = nn.Linear(in_dim, encoder_units[0]) #Encoder
+        self.fc2 = nn.Linear(encoder_units[0], encoder_units[1])
+        self.fc3 = nn.Linear(encoder_units[1], encoder_units[2]) 
 
-        self.mu = nn.Linear(2048, latent_dim) #Latent mu
-        self.log_var = nn.Linear(2048, latent_dim) #Latent logvar
+        self.mu = nn.Linear(encoder_units[2], latent_dim) #Latent mu
+        self.log_var = nn.Linear(encoder_units[2], latent_dim) #Latent logvar
 
-        self.fc4 = nn.Linear(latent_dim, 2048)
-        self.fc5 = nn.Linear(2048, 512)
-        self.fc6 = nn.Linear(512, 512)
-        self.fc7 = nn.Linear(512, in_dim) #Decoder
+        self.fc4 = nn.Linear(latent_dim, encoder_units[2])
+        self.fc5 = nn.Linear(encoder_units[2], encoder_units[1])
+        self.fc6 = nn.Linear(encoder_units[1], encoder_units[0])
+        self.fc7 = nn.Linear(encoder_units[0], in_dim) #Decoder
 
     def encode(self, x):
         h = F.relu(self.fc1(x))
@@ -54,16 +54,16 @@ class VaDE(torch.nn.Module):
 class Autoencoder(torch.nn.Module):
     def __init__(self, in_dim=in_dim, latent_dim=10):
         super(Autoencoder, self).__init__()
-        self.fc1 = nn.Linear(in_dim, 512) #Encoder
-        self.fc2 = nn.Linear(512, 512)
-        self.fc3 = nn.Linear(512, 2048) 
+        self.fc1 = nn.Linear(in_dim, encoder_units[0]) #Encoder
+        self.fc2 = nn.Linear(encoder_units[0], encoder_units[1])
+        self.fc3 = nn.Linear(encoder_units[1], encoder_units[2]) 
 
-        self.mu = nn.Linear(2048, latent_dim) #Latent code
+        self.mu = nn.Linear(encoder_units[2], latent_dim) #Latent code
 
-        self.fc4 = nn.Linear(latent_dim, 2048) 
-        self.fc5 = nn.Linear(2048, 512)
-        self.fc6 = nn.Linear(512, 512)
-        self.fc7 = nn.Linear(512, in_dim) #Decoder
+        self.fc4 = nn.Linear(latent_dim, encoder_units[2]) 
+        self.fc5 = nn.Linear(encoder_units[2], encoder_units[1])
+        self.fc6 = nn.Linear(encoder_units[1], encoder_units[0])
+        self.fc7 = nn.Linear(encoder_units[0], in_dim) #Decoder
 
     def encode(self, x):
         h = F.relu(self.fc1(x))
