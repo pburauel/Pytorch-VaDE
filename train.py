@@ -131,10 +131,9 @@ class TrainerVaDE:
         p_c = self.VaDE.pi_prior
         gamma = self.compute_gamma(z, p_c) # gamma is q_c_given_x = p_c_given_x
 
-        print(f'min of x is {x.min()}')
-        print(f'max of x is {x.max()}')        
-        print(f'min of x_hat is {x_hat.min()}')
-        print(f'max of x_hat is {x_hat.max()}')
+        # print(f'min,max of x     is {torch.round(x.min(),decimals=4)}, {torch.round(x.max(),decimals=4)}')
+        # print(f'min,max of x_hat is {torch.round(x_hat.min(),decimals=4)}, {torch.round(x_hat.max(),decimals=4)}')
+
 
         log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') # why binary cross entropy, I guess this should be replaced when using a continuous x model?!
         h = log_var.exp().unsqueeze(1) + (mu.unsqueeze(1) - self.VaDE.mu_prior).pow(2)
