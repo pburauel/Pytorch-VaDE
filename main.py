@@ -19,12 +19,13 @@ if __name__ == '__main__':
                         help='learning rate')
     parser.add_argument("--batch_size", type=int, default=100, 
                         help="Batch size")
-    parser.add_argument('--pretrain', type=bool, default=True,
+    parser.add_argument('--pretrain', type=bool, default=False,
                         help='learning rate')
     parser.add_argument('--pretrained_path', type=str, default='weights/pretrained_parameter.pth',
                         help='Output path')
     args = parser.parse_args()
 
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     dataloader = get_mnist(batch_size=args.batch_size)
