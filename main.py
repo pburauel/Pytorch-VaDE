@@ -23,7 +23,7 @@ if __name__ == '__main__':
                         help='learning rate')
     parser.add_argument("--batch_size", type=int, default=100, 
                         help="Batch size")
-    parser.add_argument('--pretrain', type=bool, default=True,
+    parser.add_argument('--pretrain', type=bool, default=False,
                         help='learning rate')
     parser.add_argument('--pretrained_path', type=str, default='weights/pretrained_parameter.pth',
                         help='Output path')

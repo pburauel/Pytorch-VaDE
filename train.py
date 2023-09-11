@@ -133,12 +133,15 @@ class TrainerVaDE:
     def compute_loss(self, x, x_hat, mu, log_var, z):
         p_c = self.VaDE.pi_prior
         gamma = self.compute_gamma(z, p_c) # gamma is q_c_given_x = p_c_given_x
-
-        # print(f'min,max of x     is {torch.round(x.min(),decimals=4)}, {torch.round(x.max(),decimals=4)}')
-        # print(f'min,max of x_hat is {torch.round(x_hat.min(),decimals=4)}, {torch.round(x_hat.max(),decimals=4)}')
+        # print(f'gamma shape {gamma.shape}')
+        print(f'min,max of z {z.min(), z.max()}')
+        print(f'gamma is {gamma[0,0]}')
+        print(f'min,max of x     is {torch.round(x.min(),decimals=4)}, {torch.round(x.max(),decimals=4)}')
+        print(f'min,max of x_hat is {torch.round(x_hat.min(),decimals=4)}, {torch.round(x_hat.max(),decimals=4)}')
 
 
         log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') # why binary cross entropy, I guess this should be replaced when using a continuous x model?!
+        # binary cross entropy is fine when target is [0,1] 
         h = log_var.exp().unsqueeze(1) + (mu.unsqueeze(1) - self.VaDE.mu_prior).pow(2)
         h = torch.sum(self.VaDE.log_var_prior + h / self.VaDE.log_var_prior.exp(), dim=2)
         log_p_z_given_c = 0.5 * torch.sum(gamma * h) # this is where number of gaussian clusters enters
