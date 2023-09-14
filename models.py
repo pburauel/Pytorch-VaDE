@@ -8,7 +8,7 @@ from global_settings import *
 
 
 class VaDE(torch.nn.Module):
-    def __init__(self, in_dim=in_dim, latent_dim=10, n_classes=10):
+    def __init__(self, in_dim=in_dim, latent_dim=5, n_classes=10): # latent_dim used to be 10
         super(VaDE, self).__init__()
 
         self.pi_prior = Parameter(torch.ones(n_classes)/n_classes)

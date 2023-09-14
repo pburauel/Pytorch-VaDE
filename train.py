@@ -136,6 +136,7 @@ class TrainerVaDE:
         # print(f'gamma shape {gamma.shape}')
         print(f'min,max of z {z.min(), z.max()}')
         print(f'gamma is {gamma[0,0]}')
+        print(f'shape of gamma in l {gamma.shape}')
         print(f'min,max of x     is {torch.round(x.min(),decimals=4)}, {torch.round(x.max(),decimals=4)}')
         print(f'min,max of x_hat is {torch.round(x_hat.min(),decimals=4)}, {torch.round(x_hat.max(),decimals=4)}')
 
@@ -157,8 +158,10 @@ class TrainerVaDE:
         h = (z.unsqueeze(1) - self.VaDE.mu_prior).pow(2) / self.VaDE.log_var_prior.exp()
         h += self.VaDE.log_var_prior
         h += torch.Tensor([np.log(np.pi*2)]).to(self.device)
-        p_z_c = torch.exp(torch.log(p_c + 1e-9).unsqueeze(0) - 0.5 * torch.sum(h, dim=2)) + 1e-9
+        print(f'shape of h {h.shape}') # h has shape (no_obs_batch, no_classes, latent_dim)
+        p_z_c = torch.exp(torch.log(p_c + 1e-9).unsqueeze(0) - 0.5 * torch.sum(h, dim=2)) + 1e-9 # sum over latent dim
         gamma = p_z_c / torch.sum(p_z_c, dim=1, keepdim=True) # this is equation 16 in the paper and the standard proba of a gaussian
+        print(f'shape of gamma {gamma.shape}')
         return gamma
 
     def cluster_acc(self, real, pred):
