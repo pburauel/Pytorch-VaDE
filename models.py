@@ -8,7 +8,7 @@ from global_settings import *
 
 
 class VaDE(torch.nn.Module):
-    def __init__(self, in_dim=in_dim, latent_dim=5, n_classes=10): # latent_dim used to be 10
+    def __init__(self, in_dim=in_dim, latent_dim=latent_dim, n_classes=n_classes): # latent_dim used to be 10
         super(VaDE, self).__init__()
 
         self.pi_prior = Parameter(torch.ones(n_classes)/n_classes)
@@ -52,7 +52,7 @@ class VaDE(torch.nn.Module):
 
 
 class Autoencoder(torch.nn.Module):
-    def __init__(self, in_dim=in_dim, latent_dim=10):
+    def __init__(self, in_dim=in_dim, latent_dim=latent_dim):
         super(Autoencoder, self).__init__()
         self.fc1 = nn.Linear(in_dim, encoder_units[0]) #Encoder
         self.fc2 = nn.Linear(encoder_units[0], encoder_units[1])

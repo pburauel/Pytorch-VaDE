@@ -15,7 +15,6 @@ def weights_init_normal(m):
     classname = m.__class__.__name__
     if classname.find("Linear") != -1:
         torch.nn.init.normal_(m.weight.data, 0.0, 0.02)
-
 class TrainerVaDE:
     """This is the trainer for the Variational Deep Embedding (VaDE).
     """
@@ -41,8 +40,11 @@ class TrainerVaDE:
             for x, _ in self.dataloader:
                 optimizer.zero_grad()
                 x = x.to(self.device)
+                # print(f'autoenc: shape of x: {x.shape}')
                 x_hat = self.autoencoder(x)
-                loss = F.binary_cross_entropy(x_hat, x, reduction='mean') # just reconstruction
+                # loss = F.binary_cross_entropy(x_hat, x, reduction='mean') # just reconstruction
+                loss = F.mse_loss(x_hat, x, reduction='mean')
+
                 # loss = F.mse_loss(x_hat, x, reduction='mean') # just reconstruction
                 loss.backward()
                 optimizer.step()
@@ -60,7 +62,7 @@ class TrainerVaDE:
         print('Fiting Gaussian Mixture Model...')
         x = torch.cat([data[0] for data in self.dataloader]).view(-1, in_dim).to(self.device) #all x samples.
         z = self.autoencoder.encode(x)
-        self.gmm = GaussianMixture(n_components=10, covariance_type='diag')
+        self.gmm = GaussianMixture(n_components=n_classes, covariance_type='diag') # !!! doublecheck
         self.gmm.fit(z.cpu().detach().numpy())
 
 
@@ -116,9 +118,10 @@ class TrainerVaDE:
         with torch.no_grad():
             total_loss = 0
             y_true, y_pred = [], []
-            for x, true in self.dataloader:
+            for x, true in self.dataloader: # !!! update
                 x = x.to(self.device)
                 x_hat, mu, log_var, z = self.VaDE(x)
+                print(f'testvade: shapes  of z, pi_prior: {z.shape}, {self.VaDE.pi_prior.shape}')
                 gamma = self.compute_gamma(z, self.VaDE.pi_prior)
                 pred = torch.argmax(gamma, dim=1)
                 loss = self.compute_loss(x, x_hat, mu, log_var, z)
@@ -131,21 +134,22 @@ class TrainerVaDE:
 
 
     def compute_loss(self, x, x_hat, mu, log_var, z):
+        # p_c = torch.sigmoid(self.VaDE.pi_prior)
         p_c = self.VaDE.pi_prior
-        gamma = self.compute_gamma(z, p_c) # gamma is q_c_given_x = p_c_given_x
-        # print(f'gamma shape {gamma.shape}')
-        print(f'min,max of z {z.min(), z.max()}')
-        print(f'gamma is {gamma[0,0]}')
-        print(f'shape of gamma in l {gamma.shape}')
-        print(f'min,max of x     is {torch.round(x.min(),decimals=4)}, {torch.round(x.max(),decimals=4)}')
-        print(f'min,max of x_hat is {torch.round(x_hat.min(),decimals=4)}, {torch.round(x_hat.max(),decimals=4)}')
+        gamma = self.compute_gamma(z, p_c) # nobs x no_classes, gamma is q_c_given_x = p_c_given_x
+        # print(f'min,max of z {z.min(), z.max()}')
+        # print(f'shape of gamma in l {gamma.shape}')
+        # print(f'min max of gamma is {gamma.min(), gamma.max()}')
+        # print(f'min,max of x     is {torch.round(x.min(),decimals=4)}, {torch.round(x.max(),decimals=4)}')
+        # print(f'min,max of x_hat is {torch.round(x_hat.min(),decimals=4)}, {torch.round(x_hat.max(),decimals=4)}')
+        # print(f'min,max of p_c {p_c.min(), p_c.max()}')
+        print(f'compute l: vade pi prior is {p_c}')
 
-
-        log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') # why binary cross entropy, I guess this should be replaced when using a continuous x model?!
-        # binary cross entropy is fine when target is [0,1] 
+        # log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') 
+        log_p_x_given_z = F.mse_loss(x_hat, x, reduction='mean')
         h = log_var.exp().unsqueeze(1) + (mu.unsqueeze(1) - self.VaDE.mu_prior).pow(2)
-        h = torch.sum(self.VaDE.log_var_prior + h / self.VaDE.log_var_prior.exp(), dim=2)
-        log_p_z_given_c = 0.5 * torch.sum(gamma * h) # this is where number of gaussian clusters enters
+        h = torch.sum(self.VaDE.log_var_prior + h / self.VaDE.log_var_prior.exp(), dim=2) # obs x n_classes x latent_dim
+        log_p_z_given_c = 0.5 * torch.sum(gamma * h) # SCALAR # this is where number of gaussian clusters enters
         log_p_c = torch.sum(gamma * torch.log(p_c + 1e-9)) # this is the update of p_c
         log_q_c_given_x = torch.sum(gamma * torch.log(gamma + 1e-9))
         log_q_z_given_x = 0.5 * torch.sum(1 + log_var) # ?
@@ -155,19 +159,24 @@ class TrainerVaDE:
         return loss
 
     def compute_gamma(self, z, p_c):
+        # print(f'compute gamma: shape of z {z.shape}')
+        # print(f'compute gamma: shape of p_c {p_c.shape}')
+        # print(f'compute gamma: min, max of p_c {p_c.min(), p_c.max()}')
         h = (z.unsqueeze(1) - self.VaDE.mu_prior).pow(2) / self.VaDE.log_var_prior.exp()
         h += self.VaDE.log_var_prior
         h += torch.Tensor([np.log(np.pi*2)]).to(self.device)
-        print(f'shape of h {h.shape}') # h has shape (no_obs_batch, no_classes, latent_dim)
+        # print(f'compute gamma: shape of h {h.shape}') # h has shape (no_obs_batch, no_classes, latent_dim)
         p_z_c = torch.exp(torch.log(p_c + 1e-9).unsqueeze(0) - 0.5 * torch.sum(h, dim=2)) + 1e-9 # sum over latent dim
+        # p_z_c size is nobs x n classes
         gamma = p_z_c / torch.sum(p_z_c, dim=1, keepdim=True) # this is equation 16 in the paper and the standard proba of a gaussian
-        print(f'shape of gamma {gamma.shape}')
+        # print(f'compute gamma: shape of gamma {gamma.shape}')
         return gamma
 
     def cluster_acc(self, real, pred):
         D = max(pred.max(), real.max())+1
         w = np.zeros((D,D), dtype=np.int64)
         for i in range(pred.size):
+            # print(f'cluster acc: pred[i] is {pred[i]}, real[i] is {real[i]}')
             w[pred[i], real[i]] += 1
         ind = linear_sum_assignment(w.max() - w)
         total_cost = w[ind[0], ind[1]].sum()

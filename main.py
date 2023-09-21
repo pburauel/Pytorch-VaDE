@@ -9,21 +9,22 @@ from torchvision import datasets, transforms
 
 from train import TrainerVaDE
 from preprocess import get_mnist
+from get_toy_data import get_toy_data
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=2,
+    parser.add_argument("--epochs", type=int, default=20,
                         help="number of iterations")
-    parser.add_argument("--epochs_autoencoder", type=int, default=2,
+    parser.add_argument("--epochs_autoencoder", type=int, default=10,
                         help="number of epochs autoencoder")
     parser.add_argument("--patience", type=int, default=50, 
                         help="Patience for Early Stopping")
     parser.add_argument('--lr', type=float, default=2e-3,
                         help='learning rate')
-    parser.add_argument("--batch_size", type=int, default=100, 
+    parser.add_argument("--batch_size", type=int, default=5, 
                         help="Batch size")
-    parser.add_argument('--pretrain', type=bool, default=False,
+    parser.add_argument('--pretrain', type=bool, default=True,
                         help='learning rate')
     parser.add_argument('--pretrained_path', type=str, default='weights/pretrained_parameter.pth',
                         help='Output path')
@@ -32,10 +33,16 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # device = 'cpu'
 
-    dataloader = get_mnist(batch_size=args.batch_size)
+    # dataloader = get_mnist(batch_size=args.batch_size)
+    dataloader = get_toy_data(batch_size=args.batch_size)
     
     vade = TrainerVaDE(args, device, dataloader)
     if args.pretrain==True:
         vade.pretrain()
     vade.train()
 
+
+
+#%%
+
+how to get the model params out?
