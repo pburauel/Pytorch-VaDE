@@ -60,10 +60,18 @@ class TrainerVaDE:
         the priors (pi, mu, var) of the VaDE model.
         """
         print('Fiting Gaussian Mixture Model...')
-        x = torch.cat([data[0] for data in self.dataloader]).view(-1, in_dim).to(self.device) #all x samples.
+        # x = torch.cat([data[0] for data in self.dataloader]).view(-1, in_dim).to(self.device) #all x samples.
+        
+        # this is the updated version, we now just take the whole data with all dimensions as input for the GMM
+        x = torch.cat([data[0] for data in self.dataloader]).to(self.device) #all x samples.
+
+        print(f'GMM: shape of x {x.shape}')
         z = self.autoencoder.encode(x)
-        self.gmm = GaussianMixture(n_components=n_classes, covariance_type='diag') # !!! doublecheck
+        print(f'GMM: shape of z {z.shape}')
+        self.gmm = GaussianMixture(n_components=n_classes, covariance_type='diag') # !!! doublecheck whether n_classes is correct here
         self.gmm.fit(z.cpu().detach().numpy())
+        
+        # here, estimate another GMM
 
 
     def save_weights_for_VaDE(self):
@@ -105,6 +113,12 @@ class TrainerVaDE:
             x = x.to(self.device)
             x_hat, mu, log_var, z = self.VaDE(x)
             #print('Before backward: {}'.format(self.VaDE.pi_prior))
+            
+            # here we need to estimate mu_x1 and sigma_x1
+            # design choice: do we do this here, in the training loop,
+            # or do we do that on all the data, once, in the pretraining
+            # >> decision: do it once in the pretraining
+            
             loss = self.compute_loss(x, x_hat, mu, log_var, z)
             loss.backward()
             self.optimizer.step()
@@ -113,12 +127,12 @@ class TrainerVaDE:
         print('Training VaDE... Epoch: {}, Loss: {}'.format(epoch, total_loss))
 
 
-    def test_VaDE(self, epoch):
+    def test_VaDE(self, epoch): # !!! update
         self.VaDE.eval()
         with torch.no_grad():
             total_loss = 0
             y_true, y_pred = [], []
-            for x, true in self.dataloader: # !!! update
+            for x, true in self.dataloader:
                 x = x.to(self.device)
                 x_hat, mu, log_var, z = self.VaDE(x)
                 print(f'testvade: shapes  of z, pi_prior: {z.shape}, {self.VaDE.pi_prior.shape}')
@@ -137,17 +151,19 @@ class TrainerVaDE:
         # p_c = torch.sigmoid(self.VaDE.pi_prior)
         p_c = self.VaDE.pi_prior
         gamma = self.compute_gamma(z, p_c) # nobs x no_classes, gamma is q_c_given_x = p_c_given_x
-        # print(f'min,max of z {z.min(), z.max()}')
-        # print(f'shape of gamma in l {gamma.shape}')
-        # print(f'min max of gamma is {gamma.min(), gamma.max()}')
-        # print(f'min,max of x     is {torch.round(x.min(),decimals=4)}, {torch.round(x.max(),decimals=4)}')
-        # print(f'min,max of x_hat is {torch.round(x_hat.min(),decimals=4)}, {torch.round(x_hat.max(),decimals=4)}')
-        # print(f'min,max of p_c {p_c.min(), p_c.max()}')
+        print(f'min,max of z {z.min(), z.max()}')
+        print(f'shape of gamma in l {gamma.shape}')
+        print(f'min max of gamma is {gamma.min(), gamma.max()}')
+        print(f'min,max of x     is {torch.round(x.min(),decimals=4)}, {torch.round(x.max(),decimals=4)}')
+        print(f'min,max of x_hat is {torch.round(x_hat.min(),decimals=4)}, {torch.round(x_hat.max(),decimals=4)}')
+        print(f'min,max of p_c {p_c.min(), p_c.max()}')
         print(f'compute l: vade pi prior is {p_c}')
+        print(f'compute l: shape of log_var: {log_var.shape}')
+        print(f'compute l: shape of mu: {mu.shape}')
 
         # log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') 
         log_p_x_given_z = F.mse_loss(x_hat, x, reduction='mean')
-        h = log_var.exp().unsqueeze(1) + (mu.unsqueeze(1) - self.VaDE.mu_prior).pow(2)
+        h = log_var.exp().unsqueeze(1) + (mu.unsqueeze(1) - self.VaDE.mu_prior).pow(2) # mu here needs the same dimensionality as VaDE.mu_prior
         h = torch.sum(self.VaDE.log_var_prior + h / self.VaDE.log_var_prior.exp(), dim=2) # obs x n_classes x latent_dim
         log_p_z_given_c = 0.5 * torch.sum(gamma * h) # SCALAR # this is where number of gaussian clusters enters
         log_p_c = torch.sum(gamma * torch.log(p_c + 1e-9)) # this is the update of p_c
@@ -163,6 +179,7 @@ class TrainerVaDE:
         # print(f'compute gamma: shape of p_c {p_c.shape}')
         # print(f'compute gamma: min, max of p_c {p_c.min(), p_c.max()}')
         h = (z.unsqueeze(1) - self.VaDE.mu_prior).pow(2) / self.VaDE.log_var_prior.exp()
+        # !!! are those VaDE priors updated???
         h += self.VaDE.log_var_prior
         h += torch.Tensor([np.log(np.pi*2)]).to(self.device)
         # print(f'compute gamma: shape of h {h.shape}') # h has shape (no_obs_batch, no_classes, latent_dim)
