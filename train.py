@@ -135,7 +135,8 @@ class TrainerVaDE:
             for x, true in self.dataloader:
                 x = x.to(self.device)
                 x_hat, mu, log_var, z = self.VaDE(x)
-                print(f'testvade: shapes  of z, pi_prior: {z.shape}, {self.VaDE.pi_prior.shape}')
+                if verbatim == 1:
+                    print(f'testvade: shapes  of z, pi_prior: {z.shape}, {self.VaDE.pi_prior.shape}')
                 gamma = self.compute_gamma(z, self.VaDE.pi_prior)
                 pred = torch.argmax(gamma, dim=1)
                 loss = self.compute_loss(x, x_hat, mu, log_var, z)
@@ -144,22 +145,24 @@ class TrainerVaDE:
                 y_pred.extend(pred.cpu().detach().numpy())
 
             acc = self.cluster_acc(np.array(y_true), np.array(y_pred))
-            print('Testing VaDE... Epoch: {}, Loss: {}, Acc: {}'.format(epoch, total_loss, acc[0]))
+            if verbatim == 1:
+                print('Testing VaDE... Epoch: {}, Loss: {}, Acc: {}'.format(epoch, total_loss, acc[0]))
 
 
     def compute_loss(self, x, x_hat, mu, log_var, z):
         # p_c = torch.sigmoid(self.VaDE.pi_prior)
         p_c = self.VaDE.pi_prior
         gamma = self.compute_gamma(z, p_c) # nobs x no_classes, gamma is q_c_given_x = p_c_given_x
-        print(f'min,max of z {z.min(), z.max()}')
-        print(f'shape of gamma in l {gamma.shape}')
-        print(f'min max of gamma is {gamma.min(), gamma.max()}')
-        print(f'min,max of x     is {torch.round(x.min(),decimals=4)}, {torch.round(x.max(),decimals=4)}')
-        print(f'min,max of x_hat is {torch.round(x_hat.min(),decimals=4)}, {torch.round(x_hat.max(),decimals=4)}')
-        print(f'min,max of p_c {p_c.min(), p_c.max()}')
-        print(f'compute l: vade pi prior is {p_c}')
-        print(f'compute l: shape of log_var: {log_var.shape}')
-        print(f'compute l: shape of mu: {mu.shape}')
+        if verbatim == 1:
+            print(f'min,max of z {z.min(), z.max()}')
+            print(f'shape of gamma in l {gamma.shape}')
+            print(f'min max of gamma is {gamma.min(), gamma.max()}')
+            print(f'min,max of x     is {torch.round(x.min(),decimals=4)}, {torch.round(x.max(),decimals=4)}')
+            print(f'min,max of x_hat is {torch.round(x_hat.min(),decimals=4)}, {torch.round(x_hat.max(),decimals=4)}')
+            print(f'min,max of p_c {p_c.min(), p_c.max()}')
+            print(f'compute l: vade pi prior is {p_c}')
+            print(f'compute l: shape of log_var: {log_var.shape}')
+            print(f'compute l: shape of mu: {mu.shape}')
 
         # log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') 
         log_p_x_given_z = F.mse_loss(x_hat, x, reduction='mean')

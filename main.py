@@ -16,18 +16,17 @@ from global_settings import *
 
 
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=2,
+    parser.add_argument("--epochs", type=int, default=30,
                         help="number of iterations")
-    parser.add_argument("--epochs_autoencoder", type=int, default=2,
+    parser.add_argument("--epochs_autoencoder", type=int, default=5,
                         help="number of epochs autoencoder")
     parser.add_argument("--patience", type=int, default=50, 
                         help="Patience for Early Stopping")
     parser.add_argument('--lr', type=float, default=2e-3,
                         help='learning rate')
-    parser.add_argument("--batch_size", type=int, default=11, 
+    parser.add_argument("--batch_size", type=int, default=200, 
                         help="Batch size")
     parser.add_argument('--pretrain', type=bool, default=True,
                         help='learning rate')
@@ -54,8 +53,12 @@ import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 
+
+from hsic_torch import *
 # how to get the model params out?
 
+
+df = pd.read_csv('toy_data.csv')
 
 df.head()
 
@@ -81,13 +84,36 @@ z1 = z[:,:latent_dim_x]
 z2 = z[:,latent_dim_x:]
 
 
-df_hat = pd.concat((pd.DataFrame(df1), pd.DataFrame(z2)), axis = 1)
-df_hat.columns = ["X1", "X2", "Y", "Z1", "Z2", "Z3"]
+# are Z1 and Z2 dependent?
+
+## this HSIC implementation is not working, test statistic scales with number of observations!!
+
+# nest step, try this: https://github.com/Black-Swan-ICL/PyRKHSstats/tree/main
+
+hsic_gam_torch(torch.from_numpy(z1), torch.from_numpy(z2))
+
+hsic_gam_torch(torch.from_numpy(z1[1:100]), torch.from_numpy(z2[1:100]))
+
+hsic_gam_torch(torch.from_numpy(z1[1:10]), torch.from_numpy(z2[1:10]))
+
+
+testStat, thresh = hsic_gam(torch.from_numpy(z1), torch.from_numpy(z2), alph = 0.05)
+## this is computing a test stat but it doesnt produce a p value....
+
+df_hat = pd.concat((pd.DataFrame(df1), pd.DataFrame(z)), axis = 1)
+
+col_names = ["X"+str(i+1) for i in range(dim_x)] + ["Y"] + ["ZX"+str(i+1) for i in range(latent_dim_x)] + ["ZY"+str(i+1) for i in range(latent_dim_y)]
+
+
+df_hat.columns = col_names
 
 
 # how good is the reconstruction?
 sns.pairplot(pd.concat((pd.DataFrame(df1), pd.DataFrame(df_hat[["X1", "X2", "Y"]])), axis = 1))
 
+
+# does the latent learn anything?
+sns.pairplot(df_hat)
 
 
 
@@ -122,7 +148,7 @@ print(model2.summary())
 
 ## now estimate the model with recoverd confounder
 # Get all columns that start with 'X' and 'L'
-x_z_cols = x_cols + [col for col in df_hat.columns if col.startswith('Z')]
+x_z_cols = x_cols + [col for col in df_hat.columns if col.startswith('ZY')]
 
 # Add a constant to the independent values
 X = sm.add_constant(df_hat[x_z_cols])
