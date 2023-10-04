@@ -1,7 +1,10 @@
 
-
+root_folder = 'C:/Users/pfbur/Box/projects/CFL-GIP/'
 import os
-os.chdir('C:/Users/pfbur/Box/projects/CFL-GIP/VaDE_code/Pytorch-VaDE')
+os.chdir(root_folder + 'VaDE_code/Pytorch-VaDE')
+
+results_folder = root_folder + 'results/'
+plot_folder = results_folder + 'plots/'
 
 import argparse 
 import torch.utils.data
@@ -11,6 +14,16 @@ from train import TrainerVaDE
 from preprocess import get_mnist
 from get_toy_data import get_toy_data
 
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+import time
+time_str = time.strftime("%Y%m%d-%H%M%S")
+
+
+
+
 
 from global_settings import *
 
@@ -18,15 +31,15 @@ from global_settings import *
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=30,
+    parser.add_argument("--epochs", type=int, default=500,
                         help="number of iterations")
-    parser.add_argument("--epochs_autoencoder", type=int, default=5,
+    parser.add_argument("--epochs_autoencoder", type=int, default=100,
                         help="number of epochs autoencoder")
-    parser.add_argument("--patience", type=int, default=50, 
+    parser.add_argument("--patience", type=int, default=10, 
                         help="Patience for Early Stopping")
-    parser.add_argument('--lr', type=float, default=2e-3,
+    parser.add_argument('--lr', type=float, default=1e-3,
                         help='learning rate')
-    parser.add_argument("--batch_size", type=int, default=200, 
+    parser.add_argument("--batch_size", type=int, default=500, 
                         help="Batch size")
     parser.add_argument('--pretrain', type=bool, default=True,
                         help='learning rate')
@@ -47,119 +60,62 @@ if __name__ == '__main__':
 
 
 
-#%%
-import seaborn as sns
-import pandas as pd
-import statsmodels.api as sm
-import statsmodels.formula.api as smf
+# def plot_losses(self):
+#     plt.plot(np.asarray(vade.losses))
+#     plt.title('Loss per epoch')
+#     plt.xlabel('Epoch')
+#     plt.ylabel('Loss')
+#     plt.show()
+    
+# plot_losses(vade)
 
 
-from hsic_torch import *
-# how to get the model params out?
+loss_direction = dict({'total': 'min',
+     'log_p_x_given_z': 'min', 
+     'log_p_z_given_c': 'min', 
+     'log_p_c': 'max', 
+     'log_q_c_given_x': 'min', 
+     'log_q_z_given_x': 'min', 
+     'acc': 'max'})
 
+def plot_losses(self):
+    num_plots = len(self.losses)
+    num_cols = 2  # You can adjust this to change the number of columns in the grid
+    num_rows = num_plots // num_cols + (num_plots % num_cols > 0)
 
-df = pd.read_csv('toy_data.csv')
+    fig, axs = plt.subplots(num_rows, num_cols, figsize=(10, 6))
+    axs = axs.flatten()  # To handle the case where num_rows or num_cols is 1
 
-df.head()
+    for i, (loss_name, loss_values) in enumerate(self.losses.items()):
+        if loss_direction[loss_name] == 'max':
+            loss_values = np.asarray(loss_values) * (-1)
+        axs[i].plot(loss_values, label=loss_name)
+        axs[i].set_title(loss_name)
+        axs[i].set_xlabel('Epoch')
+        axs[i].set_ylabel('Loss')
 
-
-df1 = df[["X1", "X2", "Y"]]
-df1 = torch.from_numpy(df1.values)
-df1 = df1.float()
-
-
-# feed through model
-xy_hat, mu, log_var, z = vade.VaDE(df1)
-
-
-# disentangle
-df1 = df1.numpy()
-xy_hat = xy_hat.detach().numpy()
-z = z.detach().numpy()
-
-xhat = xy_hat[:,:dim_x]
-yhat = xy_hat[:,dim_x:]
-
-z1 = z[:,:latent_dim_x]
-z2 = z[:,latent_dim_x:]
-
-
-# are Z1 and Z2 dependent?
-
-## this HSIC implementation is not working, test statistic scales with number of observations!!
-
-# nest step, try this: https://github.com/Black-Swan-ICL/PyRKHSstats/tree/main
-
-hsic_gam_torch(torch.from_numpy(z1), torch.from_numpy(z2))
-
-hsic_gam_torch(torch.from_numpy(z1[1:100]), torch.from_numpy(z2[1:100]))
-
-hsic_gam_torch(torch.from_numpy(z1[1:10]), torch.from_numpy(z2[1:10]))
-
-
-testStat, thresh = hsic_gam(torch.from_numpy(z1), torch.from_numpy(z2), alph = 0.05)
-## this is computing a test stat but it doesnt produce a p value....
-
-df_hat = pd.concat((pd.DataFrame(df1), pd.DataFrame(z)), axis = 1)
-
-col_names = ["X"+str(i+1) for i in range(dim_x)] + ["Y"] + ["ZX"+str(i+1) for i in range(latent_dim_x)] + ["ZY"+str(i+1) for i in range(latent_dim_y)]
-
-
-df_hat.columns = col_names
-
-
-# how good is the reconstruction?
-sns.pairplot(pd.concat((pd.DataFrame(df1), pd.DataFrame(df_hat[["X1", "X2", "Y"]])), axis = 1))
-
-
-# does the latent learn anything?
-sns.pairplot(df_hat)
+    plt.tight_layout()
+    plt.title("all losses minimized (adjusted sign for some)")
+    plt.show()
+    fig.savefig(plot_folder + "losses" + time_str  + ".pdf", 
+                bbox_inches='tight',
+                dpi = 333)   # save the figure to file     
+    
+plot_losses(vade)
 
 
 
-# naive regression
+loss_dict = vade.losses
 
-# Get all columns that start with 'X'
-x_cols = [col for col in df.columns if col.startswith('X')]
-
-# Add a constant to the independent values
-X = sm.add_constant(df[x_cols])
-
-# Fit the model
-model1 = sm.OLS(df['Y'], X).fit()
-
-# Print out the statistics
-print(model1.summary())
+def min_max_dict(d):
+    result = {}
+    for key, values in d.items():
+        if key == "acc":
+            break
+        result[key] = {'min': min(values), 'max': max(values)}
+    return result
 
 
-## true model (with known confounder)
-# Get all columns that start with 'X' and 'L'
-x_l_cols = x_cols + [col for col in df.columns if col.startswith('L')]
-
-# Add a constant to the independent values
-X = sm.add_constant(df[x_l_cols])
-
-# Fit the model
-model2 = sm.OLS(df['Y'], X).fit()
-
-# Print out the statistics
-print(model2.summary())
-
-
-## now estimate the model with recoverd confounder
-# Get all columns that start with 'X' and 'L'
-x_z_cols = x_cols + [col for col in df_hat.columns if col.startswith('ZY')]
-
-# Add a constant to the independent values
-X = sm.add_constant(df_hat[x_z_cols])
-
-# Fit the model
-model3 = sm.OLS(df_hat['Y'], X).fit()
-
-# Print out the statistics
-print(model3.summary())
-
-
-
-
-
+min_max = pd.DataFrame(min_max_dict(loss_dict)).T
+min_max.columns = ['Min', 'Max']
+print(min_max)

@@ -24,6 +24,8 @@ class TrainerVaDE:
         self.dataloader = dataloader
         self.device = device
         self.args = args
+        self.losses = {'total': [], 'log_p_x_given_z': [], 'log_p_z_given_c': [], 'log_p_c': [], 'log_q_c_given_x': [], 'log_q_z_given_x': [], 'acc': []}
+
 
 
     def pretrain(self):
@@ -119,15 +121,20 @@ class TrainerVaDE:
             # or do we do that on all the data, once, in the pretraining
             # >> decision: do it once in the pretraining
             
-            loss = self.compute_loss(x, x_hat, mu, log_var, z)
+            loss, loss_components = self.compute_loss(x, x_hat, mu, log_var, z)
+            # print(loss)
             loss.backward()
             self.optimizer.step()
             total_loss += loss.item()
+            for loss_name, loss_value in loss_components.items():
+                self.losses[loss_name].append(loss_value)
+            # self.losses.append(total_loss)
+
             #print('After backward: {}'.format(self.VaDE.pi_prior))
         print('Training VaDE... Epoch: {}, Loss: {}'.format(epoch, total_loss))
 
 
-    def test_VaDE(self, epoch): # !!! update
+    def test_VaDE(self, epoch): # !!! update, the -acc- object is NOT a single scalar, need to figure this out
         self.VaDE.eval()
         with torch.no_grad():
             total_loss = 0
@@ -139,20 +146,23 @@ class TrainerVaDE:
                     print(f'testvade: shapes  of z, pi_prior: {z.shape}, {self.VaDE.pi_prior.shape}')
                 gamma = self.compute_gamma(z, self.VaDE.pi_prior)
                 pred = torch.argmax(gamma, dim=1)
-                loss = self.compute_loss(x, x_hat, mu, log_var, z)
+                loss, loss_components = self.compute_loss(x, x_hat, mu, log_var, z)
                 total_loss += loss.item()
                 y_true.extend(true.numpy())
                 y_pred.extend(pred.cpu().detach().numpy())
 
             acc = self.cluster_acc(np.array(y_true), np.array(y_pred))
-            if verbatim == 1:
-                print('Testing VaDE... Epoch: {}, Loss: {}, Acc: {}'.format(epoch, total_loss, acc[0]))
+            # add accuracy to the loss components
+            # print(acc)
+            # self.losses["acc"].append(acc.item())
+            
+            # print('Testing VaDE... Epoch: {}, Loss: {}, Acc: {}'.format(epoch, total_loss, acc[0]))
 
 
     def compute_loss(self, x, x_hat, mu, log_var, z):
         # p_c = torch.sigmoid(self.VaDE.pi_prior)
         p_c = self.VaDE.pi_prior
-        gamma = self.compute_gamma(z, p_c) # nobs x no_classes, gamma is q_c_given_x = p_c_given_x
+        gamma = self.compute_gamma(z, p_c) # nobs x no_classes, gamma is q_c_given_x = p_c_given_z
         if verbatim == 1:
             print(f'min,max of z {z.min(), z.max()}')
             print(f'shape of gamma in l {gamma.shape}')
@@ -168,14 +178,23 @@ class TrainerVaDE:
         log_p_x_given_z = F.mse_loss(x_hat, x, reduction='mean')
         h = log_var.exp().unsqueeze(1) + (mu.unsqueeze(1) - self.VaDE.mu_prior).pow(2) # mu here needs the same dimensionality as VaDE.mu_prior
         h = torch.sum(self.VaDE.log_var_prior + h / self.VaDE.log_var_prior.exp(), dim=2) # obs x n_classes x latent_dim
-        log_p_z_given_c = 0.5 * torch.sum(gamma * h) # SCALAR # this is where number of gaussian clusters enters
-        log_p_c = torch.sum(gamma * torch.log(p_c + 1e-9)) # this is the update of p_c
-        log_q_c_given_x = torch.sum(gamma * torch.log(gamma + 1e-9))
-        log_q_z_given_x = 0.5 * torch.sum(1 + log_var) # ?
+        log_p_z_given_c = 0.5 * torch.sum(gamma * h) # ok, see eq. B --- SCALAR
+        log_p_c = torch.sum(gamma * torch.log(p_c/p_c.sum() + 1e-9)) # ok, see eq. C in Appendix -- added the division by p_c sum here because p_c is not constrained to add up to 1 -- this is not important for compute_gamma because compute_gamma(z, p_c) = compute_gamma(z, p_c * constant)
+        log_q_c_given_x = torch.sum(gamma * torch.log(gamma + 1e-9)) # eq. E in Appendix
+        log_q_z_given_x = -0.5 * torch.sum(1 + log_var) # ok, see eq. D in App., added a minus sign here and changed the sign for this component in the overall loss (original code is fine, this is just for better readability)
 
-        loss = log_p_x_given_z + log_p_z_given_c - log_p_c +  log_q_c_given_x - log_q_z_given_x
+        loss = log_p_x_given_z + log_p_z_given_c - log_p_c + log_q_c_given_x + log_q_z_given_x # changed the signs, 
+        #old:  log_p_x_given_z + log_p_z_given_c - log_p_c + log_q_c_given_x - log_q_z_given_x
+        # 
         loss /= x.size(0)
-        return loss
+        
+        loss_components = {'total': loss.item(), 
+                           'log_p_x_given_z': log_p_x_given_z.item(), 
+                           'log_p_z_given_c': log_p_z_given_c.item(), 
+                           'log_p_c': log_p_c.item(), 
+                           'log_q_c_given_x': log_q_c_given_x.item(), 
+                           'log_q_z_given_x': log_q_z_given_x.item()}
+        return loss, loss_components
 
     def compute_gamma(self, z, p_c):
         # print(f'compute gamma: shape of z {z.shape}')

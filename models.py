@@ -29,14 +29,14 @@ class VaDE(torch.nn.Module):
         self.fc7x = nn.Linear(encoder_units[0], dim_x) #Decoder
 
 
-        self.fc1y = nn.Linear(dim_y, encoder_units[0]) #Encoder
+        self.fc1y = nn.Linear(dim_x + dim_y, encoder_units[0]) #Encoder
         self.fc2y = nn.Linear(encoder_units[0], encoder_units[1])
         self.fc3y = nn.Linear(encoder_units[1], encoder_units[2]) 
 
         self.mu_y = nn.Linear(encoder_units[2], latent_dim_y) #Latent mu
         self.log_var_y = nn.Linear(encoder_units[2], latent_dim_y) #Latent logvar
 
-        self.fc4y = nn.Linear(latent_dim_y, encoder_units[2])
+        self.fc4y = nn.Linear(latent_dim_y + latent_dim_x, encoder_units[2])
         self.fc5y = nn.Linear(encoder_units[2], encoder_units[1])
         self.fc6y = nn.Linear(encoder_units[1], encoder_units[0])
         self.fc7y = nn.Linear(encoder_units[0], dim_y) #Decoder
@@ -61,7 +61,7 @@ class VaDE(torch.nn.Module):
         hx = F.relu(self.fc2x(hx))
         hx = F.relu(self.fc3x(hx))
 
-        hy = F.relu(self.fc1y(y))
+        hy = F.relu(self.fc1y(xy)) # Z2 must be a function of BOTH X and Y 
         hy = F.relu(self.fc2y(hy))
         hy = F.relu(self.fc3y(hy))
         
@@ -72,7 +72,7 @@ class VaDE(torch.nn.Module):
             print(f'encode: log_var_x  {log_var_x}, {log_var_x.shape}')
 
         mu_y = self.mu_y(hy)
-        log_var_y = self.log_var_y(hy)
+        log_var_y = self.log_var_y(hy) # Z2 must be a function of BOTH X and Y 
         if verbatim == 1:
             print(f'encode: mu_y  {mu_y}, {mu_y.shape}')
             print(f'encode: log_var_y  {log_var_y}, {log_var_y.shape}')
@@ -84,11 +84,11 @@ class VaDE(torch.nn.Module):
     def decode(self, z):
         z1 = z[:, :dim_x] # selects the first dim_x columns
         z2 = z[:, dim_x:] # selects the remaining columns
-        hx = F.relu(self.fc4x(z1))
+        hx = F.relu(self.fc4x(z1)) # only z1 is mapped to x
         hx = F.relu(self.fc5x(hx))
         hx = F.relu(self.fc6x(hx))
         
-        hy = F.relu(self.fc4y(z2))
+        hy = F.relu(self.fc4y(z)) # the whole z vector is mapped to y
         hy = F.relu(self.fc5y(hy))
         hy = F.relu(self.fc6y(hy))
         return torch.cat((self.fc7x(hx), self.fc7y(hy)), dim = 1)
@@ -112,7 +112,7 @@ class Autoencoder(torch.nn.Module):
         self.fc2x = nn.Linear(encoder_units[0], encoder_units[1])
         self.fc3x = nn.Linear(encoder_units[1], encoder_units[2]) 
 
-        self.fc1y = nn.Linear(dim_y, encoder_units[0]) #Encoder
+        self.fc1y = nn.Linear(dim_x + dim_y, encoder_units[0]) #Encoder
         self.fc2y = nn.Linear(encoder_units[0], encoder_units[1])
         self.fc3y = nn.Linear(encoder_units[1], encoder_units[2]) 
 
@@ -124,7 +124,7 @@ class Autoencoder(torch.nn.Module):
         self.fc6x = nn.Linear(encoder_units[1], encoder_units[0])
         self.fc7x = nn.Linear(encoder_units[0], dim_x) #Decoder
 
-        self.fc4y = nn.Linear(latent_dim_y, encoder_units[2]) 
+        self.fc4y = nn.Linear(latent_dim_y + latent_dim_x, encoder_units[2]) 
         self.fc5y = nn.Linear(encoder_units[2], encoder_units[1])
         self.fc6y = nn.Linear(encoder_units[1], encoder_units[0])
         self.fc7y = nn.Linear(encoder_units[0], dim_y) #Decoder
@@ -140,7 +140,7 @@ class Autoencoder(torch.nn.Module):
         hx = F.relu(self.fc2x(hx))
         hx = F.relu(self.fc3x(hx))
 
-        hy = F.relu(self.fc1y(y))
+        hy = F.relu(self.fc1y(xy)) # z2 must be a function of both x and y
         hy = F.relu(self.fc2y(hy))
         hy = F.relu(self.fc3y(hy))
         return torch.cat((self.mu_x(hx), self.mu_y(hy)), axis = 1)
@@ -153,7 +153,7 @@ class Autoencoder(torch.nn.Module):
         hx = F.relu(self.fc5x(hx))
         hx = F.relu(self.fc6x(hx))
         
-        hy = F.relu(self.fc4y(z_y))
+        hy = F.relu(self.fc4y(z))
         hy = F.relu(self.fc5y(hy))
         hy = F.relu(self.fc6y(hy))
         return torch.cat((self.fc7x(hx), self.fc7y(hy)), dim = 1)

@@ -9,13 +9,13 @@ in_dim_autoencoder = dim_x_and_y
 # in_dim = 20 # 784
 # encoder_units = [128,128,512]
 encoder_units = [512, 512, 2048]
-encoder_units = [7, 7, 9] # remember that they are doubled because we have two independent networks for X1 and X2.
+encoder_units = [4, 4, 6] # remember that they are doubled because we have two independent networks for X1 and X2.
 
 verbatim = 0
 
 
 latent_dim_x = dim_x
-latent_dim_y = 3
+latent_dim_y = 1
 
 n_classes = 4
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
