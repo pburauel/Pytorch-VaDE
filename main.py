@@ -30,9 +30,9 @@ from global_settings import *
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=10,
+    parser.add_argument("--epochs", type=int, default=150,
                         help="number of iterations")
-    parser.add_argument("--epochs_autoencoder", type=int, default=2,
+    parser.add_argument("--epochs_autoencoder", type=int, default=30,
                         help="number of epochs autoencoder")
     parser.add_argument("--patience", type=int, default=10, 
                         help="Patience for Early Stopping")
