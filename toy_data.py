@@ -4,6 +4,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+from sklearn.preprocessing import StandardScaler
 
 
 # Number of samples
@@ -74,18 +75,22 @@ df = pd.DataFrame({
     'Y': Y
 })
 
+# scale data 
+
+# Initialize the scaler
+scaler = StandardScaler()
+
+# Select only the columns to be scaled
+columns_to_scale = ['X1', 'X2', 'Y']
+df_to_scale = df[columns_to_scale]
+
+# Fit and transform the data
+df_scaled = pd.DataFrame(scaler.fit_transform(df_to_scale), columns=columns_to_scale)
+
+# Replace the original columns with the scaled ones
+df[columns_to_scale] = df_scaled
 
 Y_transformed = df['Y']
-# from keras.models import Sequential
-# from keras.layers import Dense
-# import numpy as np
-
-# # Define the model
-# model = Sequential()
-# model.add(Dense(4, input_dim=1, activation='relu', kernel_initializer='random_normal'))  # Input layer
-# model.add(Dense(4, activation='relu', kernel_initializer='random_normal'))  # Hidden layer 1
-# model.add(Dense(8, activation='relu', kernel_initializer='random_normal'))  # Hidden layer 2
-# model.add(Dense(1, activation='linear', kernel_initializer='random_normal'))  # Output layer
 
 # # Get the Y variable from your DataFrame
 # Y = df['Y'].values.reshape(-1, 1)

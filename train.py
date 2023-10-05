@@ -24,7 +24,7 @@ class TrainerVaDE:
         self.dataloader = dataloader
         self.device = device
         self.args = args
-        self.losses = {'total': [], 'log_p_x_given_z': [], 'log_p_z_given_c': [], 'log_p_c': [], 'log_q_c_given_x': [], 'log_q_z_given_x': [], 'acc': []}
+        self.losses = {'total': [], 'mse_x': [], 'mse_y': [], 'log_p_z_given_c': [], 'log_p_c': [], 'log_q_c_given_x': [], 'log_q_z_given_x': [], 'acc': []}
 
 
 
@@ -154,12 +154,16 @@ class TrainerVaDE:
             acc = self.cluster_acc(np.array(y_true), np.array(y_pred))
             # add accuracy to the loss components
             # print(acc)
-            # self.losses["acc"].append(acc.item())
+            self.losses["acc"].append(acc.item())
             
-            # print('Testing VaDE... Epoch: {}, Loss: {}, Acc: {}'.format(epoch, total_loss, acc[0]))
+            print('Testing VaDE... Epoch: {}, Loss: {}, Acc: {}'.format(epoch, total_loss, acc))
 
 
-    def compute_loss(self, x, x_hat, mu, log_var, z):
+    def compute_loss(self, xy, xy_hat, mu, log_var, z):
+        x = xy[:, :dim_x] # selects the first dim_x columns
+        y = xy[:, dim_x:] # selects the remaining columns
+        x_hat = xy_hat[:, :dim_x] # selects the first dim_x columns
+        y_hat = xy_hat[:, dim_x:] # selects the remaining columns
         # p_c = torch.sigmoid(self.VaDE.pi_prior)
         p_c = self.VaDE.pi_prior
         gamma = self.compute_gamma(z, p_c) # nobs x no_classes, gamma is q_c_given_x = p_c_given_z
@@ -175,7 +179,8 @@ class TrainerVaDE:
             print(f'compute l: shape of mu: {mu.shape}')
 
         # log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') 
-        log_p_x_given_z = F.mse_loss(x_hat, x, reduction='mean')
+        mse_x = F.mse_loss(x_hat, x, reduction='mean')
+        mse_y = F.mse_loss(y_hat, y, reduction='mean') # used to be called log_p_x_given_z 
         h = log_var.exp().unsqueeze(1) + (mu.unsqueeze(1) - self.VaDE.mu_prior).pow(2) # mu here needs the same dimensionality as VaDE.mu_prior
         h = torch.sum(self.VaDE.log_var_prior + h / self.VaDE.log_var_prior.exp(), dim=2) # obs x n_classes x latent_dim
         log_p_z_given_c = 0.5 * torch.sum(gamma * h) # ok, see eq. B --- SCALAR
@@ -183,13 +188,14 @@ class TrainerVaDE:
         log_q_c_given_x = torch.sum(gamma * torch.log(gamma + 1e-9)) # eq. E in Appendix
         log_q_z_given_x = -0.5 * torch.sum(1 + log_var) # ok, see eq. D in App., added a minus sign here and changed the sign for this component in the overall loss (original code is fine, this is just for better readability)
 
-        loss = log_p_x_given_z + log_p_z_given_c - log_p_c + log_q_c_given_x + log_q_z_given_x # changed the signs, 
+        loss = mse_x + mse_y + log_p_z_given_c - log_p_c + log_q_c_given_x + log_q_z_given_x # changed the signs, 
         #old:  log_p_x_given_z + log_p_z_given_c - log_p_c + log_q_c_given_x - log_q_z_given_x
         # 
         loss /= x.size(0)
         
         loss_components = {'total': loss.item(), 
-                           'log_p_x_given_z': log_p_x_given_z.item(), 
+                           'mse_x': mse_x.item(), 
+                           'mse_y': mse_y.item(), 
                            'log_p_z_given_c': log_p_z_given_c.item(), 
                            'log_p_c': log_p_c.item(), 
                            'log_q_c_given_x': log_q_c_given_x.item(), 
@@ -219,7 +225,7 @@ class TrainerVaDE:
             w[pred[i], real[i]] += 1
         ind = linear_sum_assignment(w.max() - w)
         total_cost = w[ind[0], ind[1]].sum()
-        return total_cost * 1.0 / pred.size * 100, w # chat gpt correction!
+        return total_cost * 1.0 / pred.size * 100#, w # chat gpt correction!
 
 
 """

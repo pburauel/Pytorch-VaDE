@@ -1,4 +1,3 @@
-
 root_folder = 'C:/Users/pfbur/Box/projects/CFL-GIP/'
 import os
 os.chdir(root_folder + 'VaDE_code/Pytorch-VaDE')
@@ -31,9 +30,9 @@ from global_settings import *
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=500,
+    parser.add_argument("--epochs", type=int, default=10,
                         help="number of iterations")
-    parser.add_argument("--epochs_autoencoder", type=int, default=100,
+    parser.add_argument("--epochs_autoencoder", type=int, default=2,
                         help="number of epochs autoencoder")
     parser.add_argument("--patience", type=int, default=10, 
                         help="Patience for Early Stopping")
@@ -71,12 +70,13 @@ if __name__ == '__main__':
 
 
 loss_direction = dict({'total': 'min',
-     'log_p_x_given_z': 'min', 
+     'mse_x': 'min', 
+     'mse_y': 'min', 
      'log_p_z_given_c': 'min', 
      'log_p_c': 'max', 
      'log_q_c_given_x': 'min', 
      'log_q_z_given_x': 'min', 
-     'acc': 'max'})
+     'acc': 'min'})
 
 def plot_losses(self):
     num_plots = len(self.losses)
@@ -95,9 +95,8 @@ def plot_losses(self):
         axs[i].set_ylabel('Loss')
 
     plt.tight_layout()
-    plt.title("all losses minimized (adjusted sign for some)")
     plt.show()
-    fig.savefig(plot_folder + "losses" + time_str  + ".pdf", 
+    fig.savefig(plot_folder + "model_" + time_str  + "_losses.pdf", 
                 bbox_inches='tight',
                 dpi = 333)   # save the figure to file     
     
@@ -119,3 +118,5 @@ def min_max_dict(d):
 min_max = pd.DataFrame(min_max_dict(loss_dict)).T
 min_max.columns = ['Min', 'Max']
 print(min_max)
+
+runcell(1, 'C:/Users/pfbur/Box/projects/CFL-GIP/VaDE_code/Pytorch-VaDE/analysis.py')

@@ -72,7 +72,14 @@ df_org_z.columns = col_names
 df_xy_xyhat = pd.concat((pd.DataFrame(df_org), pd.DataFrame(xy_hat)), axis = 1)
 df_xy_xyhat.columns = ["X"+str(i+1) for i in range(dim_x)] + ["Y"] + ["Xhat"+str(i+1) for i in range(latent_dim_x)] + ["Yhat"]
 
+# Set the figure size
+plt.figure(figsize=(3,3))  # You can adjust the values as per your requirement
+
+# Your plot code here
 sns.pairplot(df_xy_xyhat)
+
+# Save the figure
+plt.savefig(plot_folder + "model_" + time_str  + "_pairplot.pdf", bbox_inches='tight', dpi = 100)
 
 
 #%%%
