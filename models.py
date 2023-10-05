@@ -45,7 +45,7 @@ class VaDE(torch.nn.Module):
         x = xy[:, :dim_x] # selects the first dim_x columns
         y = xy[:, dim_x:] # selects the remaining columns
         
-        if verbatim == 1:
+        if verbatim == 2:
             print(f'encode x: {x}, {x.shape}')
             print(f'encode y: {y}, {y.shape}')    
         
@@ -67,13 +67,13 @@ class VaDE(torch.nn.Module):
         
         mu_x = self.mu_x(hx)
         log_var_x = self.log_var_x(hx)
-        if verbatim == 1:        
-            print(f'encode: mu_x  {mu_x}, {mu_x.shape}')
+        if verbatim == 2:        
+            print(f'encode: mu_x shape  {mu_x}, {mu_x.shape}')
             print(f'encode: log_var_x  {log_var_x}, {log_var_x.shape}')
 
         mu_y = self.mu_y(hy)
         log_var_y = self.log_var_y(hy) # Z2 must be a function of BOTH X and Y 
-        if verbatim == 1:
+        if verbatim == 2:
             print(f'encode: mu_y  {mu_y}, {mu_y.shape}')
             print(f'encode: log_var_y  {log_var_y}, {log_var_y.shape}')
         
@@ -133,7 +133,7 @@ class Autoencoder(torch.nn.Module):
         # print(f'encode x: {x}, {x.shape}')
         x = xy[:, :dim_x] # selects the first dim_x columns
         y = xy[:, dim_x:] # selects the remaining columns
-        if verbatim == 1:
+        if verbatim == 2:
             print(f'encode x: {x}, {x.shape}')
             print(f'encode y: {y}, {y.shape}')       
         hx = F.relu(self.fc1x(x))

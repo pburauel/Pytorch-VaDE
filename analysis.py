@@ -11,7 +11,6 @@ from hsic_torch import *
 
 df_org = pd.read_csv('toy_data.csv')
 
-df.head()
 
 df_obs = df_org[["X1", "X2", "Y"]]
 df_obs = torch.from_numpy(df_obs.values)

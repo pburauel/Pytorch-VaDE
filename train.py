@@ -121,7 +121,7 @@ class TrainerVaDE:
             # or do we do that on all the data, once, in the pretraining
             # >> decision: do it once in the pretraining
             
-            loss, loss_components = self.compute_loss(x, x_hat, mu, log_var, z)
+            loss, loss_components = self.compute_loss(x, x_hat, mu, log_var, z, epoch)
             # print(loss)
             loss.backward()
             self.optimizer.step()
@@ -168,16 +168,17 @@ class TrainerVaDE:
         p_c = self.VaDE.pi_prior
         gamma = self.compute_gamma(z, p_c) # nobs x no_classes, gamma is q_c_given_x = p_c_given_z
         if verbatim == 1:
-            print(f'min,max of z {z.min(), z.max()}')
-            print(f'shape of gamma in l {gamma.shape}')
-            print(f'min max of gamma is {gamma.min(), gamma.max()}')
-            print(f'min,max of x     is {torch.round(x.min(),decimals=4)}, {torch.round(x.max(),decimals=4)}')
-            print(f'min,max of x_hat is {torch.round(x_hat.min(),decimals=4)}, {torch.round(x_hat.max(),decimals=4)}')
-            print(f'min,max of p_c {p_c.min(), p_c.max()}')
-            print(f'compute l: vade pi prior is {p_c}')
-            print(f'compute l: shape of log_var: {log_var.shape}')
-            print(f'compute l: shape of mu: {mu.shape}')
-
+            # print(f'min,max of z {z.min(), z.max()}')
+            # print(f'shape of gamma in l {gamma.shape}')
+            # print(f'min max of gamma is {gamma.min(), gamma.max()}')
+            # print(f'min, max of x     is {round(x.min().item(), 4)}, {round(x.max().item(), 4)}')
+            # print(f'min, max of x_hat is {round(x_hat.min().item(), 4)}, {round(x_hat.max().item(), 4)}')
+            # print(f'min,max of p_c {p_c.min(), p_c.max()}')
+            # print(f'compute l: vade pi prior is {p_c}')
+            # print(f'compute l: shape of log_var: {log_var.shape}')
+            # print(f'compute l: shape of mu: {mu.shape}')
+            print(f'epoch is {epoch} of {self.args.epochs}')
+            
         # log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') 
         mse_x = F.mse_loss(x_hat, x, reduction='mean')
         mse_y = F.mse_loss(y_hat, y, reduction='mean') # used to be called log_p_x_given_z 
@@ -188,7 +189,8 @@ class TrainerVaDE:
         log_q_c_given_x = torch.sum(gamma * torch.log(gamma + 1e-9)) # eq. E in Appendix
         log_q_z_given_x = -0.5 * torch.sum(1 + log_var) # ok, see eq. D in App., added a minus sign here and changed the sign for this component in the overall loss (original code is fine, this is just for better readability)
 
-        loss = mse_x + mse_y + log_p_z_given_c - log_p_c + log_q_c_given_x + log_q_z_given_x # changed the signs, 
+        loss = mse_x #+ log_p_z_given_c - log_p_c + log_q_c_given_x + log_q_z_given_x # changed the signs, 
+
         #old:  log_p_x_given_z + log_p_z_given_c - log_p_c + log_q_c_given_x - log_q_z_given_x
         # 
         loss /= x.size(0)
