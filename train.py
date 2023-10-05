@@ -146,7 +146,7 @@ class TrainerVaDE:
                     print(f'testvade: shapes  of z, pi_prior: {z.shape}, {self.VaDE.pi_prior.shape}')
                 gamma = self.compute_gamma(z, self.VaDE.pi_prior)
                 pred = torch.argmax(gamma, dim=1)
-                loss, loss_components = self.compute_loss(x, x_hat, mu, log_var, z)
+                loss, loss_components = self.compute_loss(x, x_hat, mu, log_var, z, epoch)
                 total_loss += loss.item()
                 y_true.extend(true.numpy())
                 y_pred.extend(pred.cpu().detach().numpy())
@@ -159,7 +159,9 @@ class TrainerVaDE:
             print('Testing VaDE... Epoch: {}, Loss: {}, Acc: {}'.format(epoch, total_loss, acc))
 
 
-    def compute_loss(self, xy, xy_hat, mu, log_var, z):
+    def compute_loss(self, xy, xy_hat, mu, log_var, z, epoch):
+        no_epochs = self.args.epochs
+        weight = self.compute_weight(no_epochs, epoch)
         x = xy[:, :dim_x] # selects the first dim_x columns
         y = xy[:, dim_x:] # selects the remaining columns
         x_hat = xy_hat[:, :dim_x] # selects the first dim_x columns
@@ -177,7 +179,7 @@ class TrainerVaDE:
             # print(f'compute l: vade pi prior is {p_c}')
             # print(f'compute l: shape of log_var: {log_var.shape}')
             # print(f'compute l: shape of mu: {mu.shape}')
-            print(f'epoch is {epoch} of {self.args.epochs}')
+            print(f'epoch is {epoch} of {no_epochs}, weight is {weight}')
             
         # log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') 
         mse_x = F.mse_loss(x_hat, x, reduction='mean')
@@ -189,7 +191,7 @@ class TrainerVaDE:
         log_q_c_given_x = torch.sum(gamma * torch.log(gamma + 1e-9)) # eq. E in Appendix
         log_q_z_given_x = -0.5 * torch.sum(1 + log_var) # ok, see eq. D in App., added a minus sign here and changed the sign for this component in the overall loss (original code is fine, this is just for better readability)
 
-        loss = mse_x #+ log_p_z_given_c - log_p_c + log_q_c_given_x + log_q_z_given_x # changed the signs, 
+        loss = mse_x + weight * mse_y #+ log_p_z_given_c - log_p_c + log_q_c_given_x + log_q_z_given_x # changed the signs, 
 
         #old:  log_p_x_given_z + log_p_z_given_c - log_p_c + log_q_c_given_x - log_q_z_given_x
         # 
@@ -203,6 +205,15 @@ class TrainerVaDE:
                            'log_q_c_given_x': log_q_c_given_x.item(), 
                            'log_q_z_given_x': log_q_z_given_x.item()}
         return loss, loss_components
+    
+    def compute_weight(self, no_epochs, epoch):
+        if epoch < no_epochs / 4:
+            weight = 0
+        elif epoch < no_epochs * 3 / 4:
+            weight = 2 * (epoch - no_epochs / 4) / no_epochs
+        else:
+            weight = 1
+        return weight
 
     def compute_gamma(self, z, p_c):
         # print(f'compute gamma: shape of z {z.shape}')
