@@ -10,6 +10,8 @@ from models import Autoencoder, VaDE
 
 from global_settings import *
 
+import pdb
+
 
 def weights_init_normal(m):
     classname = m.__class__.__name__
@@ -162,24 +164,26 @@ class TrainerVaDE:
     def compute_loss(self, xy, xy_hat, mu, log_var, z, epoch):
         no_epochs = self.args.epochs
         weight = self.compute_weight(no_epochs, epoch)
+        weight2 = self.compute_weight2(no_epochs, epoch)
         x = xy[:, :dim_x] # selects the first dim_x columns
         y = xy[:, dim_x:] # selects the remaining columns
         x_hat = xy_hat[:, :dim_x] # selects the first dim_x columns
         y_hat = xy_hat[:, dim_x:] # selects the remaining columns
         # p_c = torch.sigmoid(self.VaDE.pi_prior)
-        p_c = self.VaDE.pi_prior
+        # p_c = self.VaDE.pi_prior # this sometimes has negative values, so we need a fix
+        p_c = torch.clamp(self.VaDE.pi_prior, min=1e-9) # just clamp it !!! double check whether there is a better solution
         gamma = self.compute_gamma(z, p_c) # nobs x no_classes, gamma is q_c_given_x = p_c_given_z
         if verbatim == 1:
-            # print(f'min,max of z {z.min(), z.max()}')
-            # print(f'shape of gamma in l {gamma.shape}')
-            # print(f'min max of gamma is {gamma.min(), gamma.max()}')
-            # print(f'min, max of x     is {round(x.min().item(), 4)}, {round(x.max().item(), 4)}')
-            # print(f'min, max of x_hat is {round(x_hat.min().item(), 4)}, {round(x_hat.max().item(), 4)}')
-            # print(f'min,max of p_c {p_c.min(), p_c.max()}')
-            # print(f'compute l: vade pi prior is {p_c}')
-            # print(f'compute l: shape of log_var: {log_var.shape}')
-            # print(f'compute l: shape of mu: {mu.shape}')
-            print(f'epoch is {epoch} of {no_epochs}, weight is {weight}')
+            print(f'min,max of z {z.min(), z.max()}')
+            print(f'shape of gamma in l {gamma.shape}')
+            print(f'min max of gamma is {gamma.min(), gamma.max()}')
+            print(f'min, max of x     is {round(x.min().item(), 4)}, {round(x.max().item(), 4)}')
+            print(f'min, max of x_hat is {round(x_hat.min().item(), 4)}, {round(x_hat.max().item(), 4)}')
+            print(f'min,max of p_c {p_c.min(), p_c.max()}')
+            print(f'compute l: vade pi prior is {p_c}')
+            print(f'compute l: shape of log_var: {log_var.shape}')
+            print(f'compute l: shape of mu: {mu.shape}')
+            # print(f'epoch is {epoch} of {no_epochs}, weight is {weight}')
             
         # log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') 
         mse_x = F.mse_loss(x_hat, x, reduction='mean')
@@ -191,11 +195,16 @@ class TrainerVaDE:
         log_q_c_given_x = torch.sum(gamma * torch.log(gamma + 1e-9)) # eq. E in Appendix
         log_q_z_given_x = -0.5 * torch.sum(1 + log_var) # ok, see eq. D in App., added a minus sign here and changed the sign for this component in the overall loss (original code is fine, this is just for better readability)
 
-        loss = mse_x + weight * mse_y #+ log_p_z_given_c - log_p_c + log_q_c_given_x + log_q_z_given_x # changed the signs, 
-
+        # loss = mse_x + weight * mse_y #+ weight * log_p_z_given_c #- log_p_c + log_q_c_given_x + log_q_z_given_x # changed the signs, 
+        loss = mse_x + weight * mse_y #- weight* log_p_c #+ weight * log_p_z_given_c #+ log_q_c_given_x + log_q_z_given_x # changed the signs, 
+        loss = loss - weight2 * log_p_c
         #old:  log_p_x_given_z + log_p_z_given_c - log_p_c + log_q_c_given_x - log_q_z_given_x
         # 
         loss /= x.size(0)
+        
+        # Assuming 'loss' is your loss variable
+        if np.isnan(loss.detach().numpy()):
+            pdb.set_trace()
         
         loss_components = {'total': loss.item(), 
                            'mse_x': mse_x.item(), 
@@ -206,11 +215,28 @@ class TrainerVaDE:
                            'log_q_z_given_x': log_q_z_given_x.item()}
         return loss, loss_components
     
+
+
     def compute_weight(self, no_epochs, epoch):
-        if epoch < no_epochs / 4:
+        if epoch < no_epochs * 2 / 8:
             weight = 0
-        elif epoch < no_epochs * 3 / 4:
-            weight = 2 * (epoch - no_epochs / 4) / no_epochs
+        elif epoch < no_epochs * 4 / 8:
+            weight = (epoch - no_epochs * 2 / 8) / (no_epochs * 2 / 8)
+        else:
+            weight = 1
+        return weight
+        # if epoch < no_epochs / 4:
+        #     weight = 0
+        # elif epoch < no_epochs * 3 / 4:
+        #     weight = 2 * (epoch - no_epochs / 4) / no_epochs
+        # else:
+        #     weight = 1
+        # return weight
+    def compute_weight2(self, epoch, no_epochs):
+        if epoch < no_epochs * 4 / 8:
+            weight = 0
+        elif epoch < no_epochs * 6 / 8:
+            weight = (epoch - no_epochs * 4 / 8) / (no_epochs * 2 / 8)
         else:
             weight = 1
         return weight

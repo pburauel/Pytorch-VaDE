@@ -30,9 +30,9 @@ from global_settings import *
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=150,
+    parser.add_argument("--epochs", type=int, default=100,
                         help="number of iterations")
-    parser.add_argument("--epochs_autoencoder", type=int, default=1,
+    parser.add_argument("--epochs_autoencoder", type=int, default=50,
                         help="number of epochs autoencoder")
     parser.add_argument("--patience", type=int, default=10, 
                         help="Patience for Early Stopping")
@@ -40,7 +40,7 @@ if __name__ == '__main__':
                         help='learning rate')
     parser.add_argument("--batch_size", type=int, default=500, 
                         help="Batch size")
-    parser.add_argument('--pretrain', type=bool, default=False,
+    parser.add_argument('--pretrain', type=bool, default=True,
                         help='learning rate')
     parser.add_argument('--pretrained_path', type=str, default='weights/pretrained_parameter.pth',
                         help='Output path')
