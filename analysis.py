@@ -161,17 +161,17 @@ xy_decode.columns = ["X1hat", "X2hat", "Yhat"]
 # run regression
 
 # Add a constant to the independent values
-X = sm.add_constant(xy_decode[x_cols])
+X = sm.add_constant(xy_decode[[c + "hat" for c in x_cols]])
 
 # Fit the model
-modelz = sm.OLS(xy_decode['Y'], X).fit()
+modelz = sm.OLS(xy_decode['Yhat'], X).fit()
 
 print(modelz.summary())
 
 # sns.histplot(xy_decode[,2])
 # sns.histplot(y_decode.detach().numpy()[:,2])
 # sns.histplot(yhat[:,0])
-sns.pairplot(xy_decode)
+# sns.pairplot(xy_decode)
 
 df_org_decode = pd.concat((df_obs, xy_decode), axis = 1)
 

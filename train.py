@@ -94,7 +94,7 @@ class TrainerVaDE:
         state_dict = self.autoencoder.state_dict()
 
         self.VaDE.load_state_dict(state_dict, strict=False)
-        self.VaDE.pi_prior.data = torch.from_numpy(self.gmm.weights_).float().to(self.device)
+        self.VaDE.pi_prior.data = torch.log(torch.from_numpy(self.gmm.weights_).float().to(self.device))
         self.VaDE.mu_prior.data = torch.from_numpy(self.gmm.means_).float().to(self.device)
         self.VaDE.log_var_prior.data = torch.log(torch.from_numpy(self.gmm.covariances_)).float().to(self.device)
         torch.save(self.VaDE.state_dict(), self.args.pretrained_path)    
@@ -159,7 +159,7 @@ class TrainerVaDE:
                 x_hat, mu, log_var, z = self.VaDE(x)
                 if verbatim == 1:
                     print(f'testvade: shapes  of z, pi_prior: {z.shape}, {self.VaDE.pi_prior.shape}')
-                gamma = self.compute_gamma(z, self.VaDE.pi_prior)
+                gamma = self.compute_gamma(z, torch.exp(self.VaDE.pi_prior))
                 pred = torch.argmax(gamma, dim=1)
                 loss, loss_components, _ = self.compute_loss(x, x_hat, mu, log_var, z, epoch, true)
                 total_loss += loss.item()
@@ -187,7 +187,7 @@ class TrainerVaDE:
         # p_c = self.VaDE.pi_prior # this sometimes has negative values, so we need a fix
         # p_c = torch.clamp(self.VaDE.pi_prior, min=1e-9) # just clamp it !!! double check whether there is a better solution
         # p_c = torch.sigmoid(self.VaDE.pi_prior)
-        p_c = torch.clamp(self.VaDE.pi_prior, min=1e-9) # just clamp it !!! double check whether there is a better solution
+        p_c = torch.exp(self.VaDE.pi_prior) # just clamp it !!! double check whether there is a better solution
         gamma = self.compute_gamma(z, p_c) # nobs x no_classes, gamma is q_c_given_x = p_c_given_z
         # if verbatim == 1:
             # print(f'min,max of z {z.min(), z.max()}')
