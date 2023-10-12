@@ -7,11 +7,10 @@ from sklearn.mixture import GaussianMixture
 from global_settings import *
 
 
-
 class VaDE(torch.nn.Module):
     def __init__(self, dim_x = dim_x, dim_y = dim_y, latent_dim_x = latent_dim_x, latent_dim_y = latent_dim_y, n_classes=n_classes): # latent_dim used to be 10
         super(VaDE, self).__init__()
-
+        # self.pi_prior = Parameter(torch.ones(n_classes)/n_classes)# 
         self.pi_prior = Parameter(torch.ones(n_classes)/n_classes)
         self.mu_prior = Parameter(torch.zeros(n_classes, latent_dim_x + latent_dim_y))
         self.log_var_prior = Parameter(torch.randn(n_classes, latent_dim_x + latent_dim_y))
@@ -27,7 +26,6 @@ class VaDE(torch.nn.Module):
         self.fc5x = nn.Linear(encoder_units[2], encoder_units[1])
         self.fc6x = nn.Linear(encoder_units[1], encoder_units[0])
         self.fc7x = nn.Linear(encoder_units[0], dim_x) #Decoder
-
 
         self.fc1y = nn.Linear(dim_x + dim_y, encoder_units[0]) #Encoder
         self.fc2y = nn.Linear(encoder_units[0], encoder_units[1])

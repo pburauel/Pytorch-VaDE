@@ -13,12 +13,11 @@ df_org = pd.read_csv('toy_data.csv')
 
 
 df_obs = df_org[["X1", "X2", "Y"]]
-df_obs = torch.from_numpy(df_obs.values)
-df_obs = df_obs.float()
+
 
 
 # feed through model
-xy_hat, mu, log_var, z = vade.VaDE(df_obs)
+xy_hat, mu, log_var, z = vade.VaDE(torch.from_numpy(df_obs.values).float())
 
 
 
@@ -76,21 +75,20 @@ plt.savefig(plot_folder + "model_" + time_str  + "_pairplot.pdf", bbox_inches='t
 
 
 #%%% run regressions
-# does the latent learn anything?
-sns.pairplot(df_hat)
+
 
 
 
 # naive regression
 
 # Get all columns that start with 'X'
-x_cols = [col for col in df.columns if col.startswith('X')]
+x_cols = [col for col in df_org.columns if col.startswith('X')]
 
 # Add a constant to the independent values
-X = sm.add_constant(df[x_cols])
+X = sm.add_constant(df_org[x_cols])
 
 # Fit the model
-model1 = sm.OLS(df['Y'], X).fit()
+model1 = sm.OLS(df_org['Y'], X).fit()
 
 # Print out the statistics
 print(model1.summary())
@@ -98,13 +96,13 @@ print(model1.summary())
 
 ## true model (with known confounder)
 # Get all columns that start with 'X' and 'L'
-x_l_cols = x_cols + [col for col in df.columns if col.startswith('L')]
+x_l_cols = x_cols + [col for col in df_org.columns if col.startswith('L')]
 
 # Add a constant to the independent values
-X = sm.add_constant(df[x_l_cols])
+X = sm.add_constant(df_org[x_l_cols])
 
 # Fit the model
-model2 = sm.OLS(df['Y'], X).fit()
+model2 = sm.OLS(df_org['Y'], X).fit()
 
 # Print out the statistics
 print(model2.summary())
@@ -112,13 +110,13 @@ print(model2.summary())
 
 ## now estimate the model with recoverd confounder
 # Get all columns that start with 'X' and 'L'
-x_z_cols = x_cols + [col for col in df_hat.columns if col.startswith('ZY')]
+x_z_cols = x_cols + [col for col in df_obs_z.columns if col.startswith('ZY')]
 
 # Add a constant to the independent values
-X = sm.add_constant(df_hat[x_z_cols])
+X = sm.add_constant(df_obs_z[x_z_cols])
 
 # Fit the model
-model3 = sm.OLS(df_hat['Y'], X).fit()
+model3 = sm.OLS(df_obs_z['Y'], X).fit()
 
 # Print out the statistics
 print(model3.summary())
@@ -129,6 +127,7 @@ print(model3.summary())
 
 
 pi_c = vade.VaDE.pi_prior.detach().numpy()
+pi_c = np.clip(pi_c, a_min = 0, a_max = pi_c.max())
 pi_c = pi_c/pi_c.sum()
 mu_prior = vade.VaDE.mu_prior.detach().numpy() # size #C x #L
 log_var_prior = vade.VaDE.log_var_prior.detach().numpy()
@@ -155,10 +154,25 @@ posterior_z1_x = z1
 
 
 xy_decode = vade.VaDE.decode(torch.cat((torch.from_numpy(posterior_z1_x), torch.from_numpy(prior_z2).float()), axis = 1))
-xy_decode = xy_decode.detach().numpy()
+xy_decode = pd.DataFrame(xy_decode.detach().numpy())
 
+xy_decode.columns = ["X1hat", "X2hat", "Yhat"]
 
-sns.histplot(xy_decode.detach().numpy()[:,2])
-sns.histplot(y_decode.detach().numpy()[:,2])
-sns.histplot(yhat[:,0])
+# run regression
 
+# Add a constant to the independent values
+X = sm.add_constant(xy_decode[x_cols])
+
+# Fit the model
+modelz = sm.OLS(xy_decode['Y'], X).fit()
+
+print(modelz.summary())
+
+# sns.histplot(xy_decode[,2])
+# sns.histplot(y_decode.detach().numpy()[:,2])
+# sns.histplot(yhat[:,0])
+sns.pairplot(xy_decode)
+
+df_org_decode = pd.concat((df_obs, xy_decode), axis = 1)
+
+sns.pairplot(df_org_decode)

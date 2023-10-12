@@ -37,10 +37,6 @@ for l in range(M.shape[0]):
 
 print("Mutual Information:", MI)
 
-# Sample H and L from the joint distribution
-HL = np.random.choice([0, 1, 2, 3], size=n_samples, p=M.flatten())
-H, L = HL // 2, HL % 2
-
 
 
 ## option 2 to generate H and L

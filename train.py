@@ -26,7 +26,16 @@ class TrainerVaDE:
         self.dataloader = dataloader
         self.device = device
         self.args = args
-        self.losses = {'total': [], 'mse_x': [], 'mse_y': [], 'log_p_z_given_c': [], 'log_p_c': [], 'log_q_c_given_x': [], 'log_q_z_given_x': [], 'acc': []}
+        self.losses = {'total': [], 
+                       'mse_x': [], 
+                       'mse_y': [], 
+                       'log_p_z_given_c': [], 
+                       'log_p_c': [], 
+                       'log_q_c_given_x': [], 
+                       'log_q_z_given_x': [], 
+                       'acc': []}
+        self.training_stats = {'p_c': [],
+                               'gamma_pred': []}
 
 
 
@@ -112,7 +121,7 @@ class TrainerVaDE:
         self.VaDE.train()
 
         total_loss = 0
-        for x, _ in self.dataloader:
+        for x, true_label in self.dataloader:
             self.optimizer.zero_grad()
             x = x.to(self.device)
             x_hat, mu, log_var, z = self.VaDE(x)
@@ -123,20 +132,24 @@ class TrainerVaDE:
             # or do we do that on all the data, once, in the pretraining
             # >> decision: do it once in the pretraining
             
-            loss, loss_components = self.compute_loss(x, x_hat, mu, log_var, z, epoch)
+            loss, loss_components, training_stats = self.compute_loss(x, x_hat, mu, log_var, z, epoch, true_label)
             # print(loss)
             loss.backward()
             self.optimizer.step()
             total_loss += loss.item()
+            
+
+            
             for loss_name, loss_value in loss_components.items():
                 self.losses[loss_name].append(loss_value)
-            # self.losses.append(total_loss)
+            for training_stats_name, training_stats_value in training_stats.items():
+                self.training_stats[training_stats_name].append(training_stats_value)
 
             #print('After backward: {}'.format(self.VaDE.pi_prior))
         print('Training VaDE... Epoch: {}, Loss: {}'.format(epoch, total_loss))
 
 
-    def test_VaDE(self, epoch): # !!! update, the -acc- object is NOT a single scalar, need to figure this out
+    def test_VaDE(self, epoch): 
         self.VaDE.eval()
         with torch.no_grad():
             total_loss = 0
@@ -148,7 +161,7 @@ class TrainerVaDE:
                     print(f'testvade: shapes  of z, pi_prior: {z.shape}, {self.VaDE.pi_prior.shape}')
                 gamma = self.compute_gamma(z, self.VaDE.pi_prior)
                 pred = torch.argmax(gamma, dim=1)
-                loss, loss_components = self.compute_loss(x, x_hat, mu, log_var, z, epoch)
+                loss, loss_components, _ = self.compute_loss(x, x_hat, mu, log_var, z, epoch, true)
                 total_loss += loss.item()
                 y_true.extend(true.numpy())
                 y_pred.extend(pred.cpu().detach().numpy())
@@ -156,33 +169,37 @@ class TrainerVaDE:
             acc = self.cluster_acc(np.array(y_true), np.array(y_pred))
             # add accuracy to the loss components
             # print(acc)
-            self.losses["acc"].append(acc.item())
+            # self.losses["acc"].append(acc.item())
             
             print('Testing VaDE... Epoch: {}, Loss: {}, Acc: {}'.format(epoch, total_loss, acc))
 
 
-    def compute_loss(self, xy, xy_hat, mu, log_var, z, epoch):
+    def compute_loss(self, xy, xy_hat, mu, log_var, z, epoch, true_label):
         no_epochs = self.args.epochs
         weight = self.compute_weight(no_epochs, epoch)
         weight2 = self.compute_weight2(no_epochs, epoch)
+        weights = self.compute_weights(no_epochs, epoch, no_weights = 3)
         x = xy[:, :dim_x] # selects the first dim_x columns
         y = xy[:, dim_x:] # selects the remaining columns
         x_hat = xy_hat[:, :dim_x] # selects the first dim_x columns
         y_hat = xy_hat[:, dim_x:] # selects the remaining columns
         # p_c = torch.sigmoid(self.VaDE.pi_prior)
         # p_c = self.VaDE.pi_prior # this sometimes has negative values, so we need a fix
+        # p_c = torch.clamp(self.VaDE.pi_prior, min=1e-9) # just clamp it !!! double check whether there is a better solution
+        # p_c = torch.sigmoid(self.VaDE.pi_prior)
         p_c = torch.clamp(self.VaDE.pi_prior, min=1e-9) # just clamp it !!! double check whether there is a better solution
         gamma = self.compute_gamma(z, p_c) # nobs x no_classes, gamma is q_c_given_x = p_c_given_z
-        if verbatim == 1:
-            print(f'min,max of z {z.min(), z.max()}')
-            print(f'shape of gamma in l {gamma.shape}')
-            print(f'min max of gamma is {gamma.min(), gamma.max()}')
-            print(f'min, max of x     is {round(x.min().item(), 4)}, {round(x.max().item(), 4)}')
-            print(f'min, max of x_hat is {round(x_hat.min().item(), 4)}, {round(x_hat.max().item(), 4)}')
-            print(f'min,max of p_c {p_c.min(), p_c.max()}')
-            print(f'compute l: vade pi prior is {p_c}')
-            print(f'compute l: shape of log_var: {log_var.shape}')
-            print(f'compute l: shape of mu: {mu.shape}')
+        # if verbatim == 1:
+            # print(f'min,max of z {z.min(), z.max()}')
+            # print(f'shape of gamma in l {gamma.shape}')
+            # print(f'min max of gamma is {gamma.min(), gamma.max()}')
+            # print(f'min, max of x     is {round(x.min().item(), 4)}, {round(x.max().item(), 4)}')
+            # print(f'min, max of x_hat is {round(x_hat.min().item(), 4)}, {round(x_hat.max().item(), 4)}')
+            # print(f'min,max of p_c {p_c.min(), p_c.max()}')
+            # print(f'compute l: vade pi prior is {p_c}')
+            # print(f'compute l: shape of log_var: {log_var.shape}')
+            # print(f'compute l: shape of mu: {mu.shape}')
+            # print(f'shape of p_c in l {p_c.shape}')
             # print(f'epoch is {epoch} of {no_epochs}, weight is {weight}')
             
         # log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') 
@@ -195,13 +212,16 @@ class TrainerVaDE:
         log_q_c_given_x = torch.sum(gamma * torch.log(gamma + 1e-9)) # eq. E in Appendix
         log_q_z_given_x = -0.5 * torch.sum(1 + log_var) # ok, see eq. D in App., added a minus sign here and changed the sign for this component in the overall loss (original code is fine, this is just for better readability)
 
-        # loss = mse_x + weight * mse_y #+ weight * log_p_z_given_c #- log_p_c + log_q_c_given_x + log_q_z_given_x # changed the signs, 
-        loss = mse_x + weight * mse_y #- weight* log_p_c #+ weight * log_p_z_given_c #+ log_q_c_given_x + log_q_z_given_x # changed the signs, 
-        loss = loss - weight2 * log_p_c
+        loss = 1000 * mse_x + 1000 * weights[1] * mse_y + weights[2] * log_p_z_given_c - weights[2] * log_p_c + weights[2] * log_q_c_given_x + weights[2] * log_q_z_given_x # changed the signs, 
+        # loss = mse_x + weights[1] * mse_y #- weight* log_p_c #+ weight * log_p_z_given_c #+ log_q_c_given_x + log_q_z_given_x # changed the signs, 
+        # loss = loss - weights[2] * log_p_c + weights[3] * log_p_z_given_c + weights[6] * log_q_c_given_x 
+        # loss = mse_x +  weights[1] * mse_y +  weights[2] * log_p_z_given_c -  weights[3] * log_p_c +  weights[4] * log_q_c_given_x +  weights[5] *  log_q_z_given_x
         #old:  log_p_x_given_z + log_p_z_given_c - log_p_c + log_q_c_given_x - log_q_z_given_x
         # 
         loss /= x.size(0)
         
+        # compute accuracy    
+        acc = self.cluster_acc(np.array(true_label.numpy()), np.array(torch.argmax(gamma, dim=1).cpu().detach().numpy()))
         # Assuming 'loss' is your loss variable
         if np.isnan(loss.detach().numpy()):
             pdb.set_trace()
@@ -212,8 +232,11 @@ class TrainerVaDE:
                            'log_p_z_given_c': log_p_z_given_c.item(), 
                            'log_p_c': log_p_c.item(), 
                            'log_q_c_given_x': log_q_c_given_x.item(), 
-                           'log_q_z_given_x': log_q_z_given_x.item()}
-        return loss, loss_components
+                           'log_q_z_given_x': log_q_z_given_x.item(),
+                           'acc': acc}
+        training_stats = {'p_c' : p_c,
+                          'gamma_pred' : torch.argmax(gamma, dim=1)}
+        return loss, loss_components, training_stats
     
 
 
@@ -240,6 +263,24 @@ class TrainerVaDE:
         else:
             weight = 1
         return weight
+
+    def compute_weights(self, epoch, no_epochs, no_weights):
+        weights = [0] * no_weights
+        interval_length = (no_epochs * 3 / 4) / no_weights
+
+        for i in range(no_weights):
+            interval_start = i * interval_length
+            interval_end = (i + 1) * interval_length
+
+            if epoch < interval_start:
+                weights[i] = 0
+            elif epoch < interval_end:
+                weights[i] = (epoch - interval_start) / interval_length
+            else:
+                weights[i] = 1
+
+        return weights
+
 
     def compute_gamma(self, z, p_c):
         # print(f'compute gamma: shape of z {z.shape}')
