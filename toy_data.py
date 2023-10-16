@@ -59,7 +59,7 @@ X[H == 0] = np.random.normal(loc=[-1, -1], scale=[0.5, 0.5], size=(np.sum(H == 0
 X[H == 1] = np.random.normal(loc=[1, 1], scale=[0.5, 0.5], size=(np.sum(H == 1), 2))
 
 # L causes Y and X causes Y
-Y = np.array([l + np.sum(x) for l, x in zip(L, X)])  # Y is influenced by both L and X
+Y = np.array([l + np.sum(x) for l, x in zip(L, X)]) + np.random.normal(0,1)   # Y is influenced by both L and X
 
 # Create a DataFrame for easier plotting
 df = pd.DataFrame({

@@ -1,5 +1,3 @@
-# for _ in range(10):
-
 root_folder = 'C:/Users/pfbur/Box/projects/CFL-GIP/'
 import os
 os.chdir(root_folder + 'VaDE_code/Pytorch-VaDE')
@@ -28,15 +26,15 @@ from global_settings import *
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=200,
+    parser.add_argument("--epochs", type=int, default=500,
                         help="number of iterations")
-    parser.add_argument("--epochs_autoencoder", type=int, default=100,
+    parser.add_argument("--epochs_autoencoder", type=int, default=50,
                         help="number of epochs autoencoder")
     parser.add_argument("--patience", type=int, default=10, 
                         help="Patience for Early Stopping")
     parser.add_argument('--lr', type=float, default=1e-3,
                         help='learning rate')
-    parser.add_argument("--batch_size", type=int, default=500, 
+    parser.add_argument("--batch_size", type=int, default=100, 
                         help="Batch size")
     parser.add_argument('--pretrain', type=bool, default=True,
                         help='learning rate')
@@ -48,14 +46,27 @@ if __name__ == '__main__':
     # device = 'cpu'
 
     # dataloader = get_mnist(batch_size=args.batch_size)
-    dataloader = get_toy_data(batch_size=args.batch_size)
+    train_loader, test_loader = get_toy_data(batch_size=args.batch_size)
     
-    vade = TrainerVaDE(args, device, dataloader)
+    vade = TrainerVaDE(args, device, train_loader, test_loader)
     if args.pretrain==True:
         vade.pretrain()
     vade.train()
 
 
+### plot autoencoder losses
+
+
+fig, axs = plt.subplots(figsize=(10, 9))  # Create a figure and a set of subplots
+
+axs.plot(vade.vae_loss['loss'], label='train')  # Assuming 'vade.vae_loss' and 'vade.vae_loss_test' are dictionaries with key 'loss'
+axs.plot(vade.vae_loss_test['loss'], label='test')
+axs.set_xlabel('Epoch')
+axs.set_ylabel('Loss')
+
+plt.tight_layout()
+plt.legend()  # To show labels in the plot
+plt.show()
 
 # def plot_losses(self):
 #     plt.plot(np.asarray(vade.losses))
@@ -67,6 +78,33 @@ if __name__ == '__main__':
 # plot_losses(vade)
 
 training_stats = vade.training_stats
+len_train = len(training_stats["p_c"])
+training_stats_test = vade.training_stats_test
+len_test = len(training_stats_test["p_c"])
+
+training_stats = vade.training_stats
+len_train = len(training_stats["p_c"])
+losses_test = vade.losses_test
+# losses_test_temp = losses_test
+
+# vade_losses_temp = losses_test
+
+import numpy as np
+
+# Calculate the repeat factor, duplicate values for the test dictionary, since there are fewer observations
+repeat_factor = len(vade.losses['total']) // len(vade.losses_test['total'])
+
+
+for loss_name, loss_values in vade.losses_test.items():
+    # Convert the list to a numpy array
+    loss_values_array = np.array(loss_values)
+    
+    # Repeat the elements in the array
+    loss_values_repeated = np.repeat(loss_values_array, repeat_factor)
+    
+    # Convert the repeated array back to a list and update the dictionary
+    vade.losses_test[loss_name] = loss_values_repeated.tolist()
+
 
 loss_direction = dict({'total': 'min',
      'mse_x': 'min', 
@@ -101,7 +139,15 @@ def plot_losses(self):
         axs[i].set_title(loss_name)
         axs[i].set_xlabel('Epoch')
         axs[i].set_ylabel('Loss')
-        
+
+
+    for i, (loss_name, loss_values) in enumerate(self.losses_test.items()):
+        if loss_direction[loss_name] == 'max':
+            loss_values = np.asarray(loss_values) * (-1)
+        axs[i].plot(loss_values, label=loss_name)
+        axs[i].set_title(loss_name)
+        axs[i].set_xlabel('Epoch')
+        axs[i].set_ylabel('Loss')        
         
     axs[8].set_title('p(c|z) = q(c|x)')
     for i in range(4):
@@ -128,6 +174,8 @@ def plot_losses(self):
 plot_losses(vade)
 
 
+
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -149,10 +197,25 @@ min_max = pd.DataFrame(min_max_dict(loss_dict)).T
 min_max.columns = ['Min', 'Max']
 print(min_max)
 
-for item in loss_dict.items():
-    print(len(item[1]))
+# for item in loss_dict.items():
+#     print(len(item[1]))
+
 loss_df = pd.DataFrame(loss_dict)
 
 acc_list = loss_dict['acc']
+
+
+# for i, (loss_name, loss_values) in enumerate(vade.losses.items()):
+#     print(i)
+#     print(loss_name)
+#     print(type(loss_values))
+#     print(len(loss_values))
+
+# for i, (loss_name, loss_values) in enumerate(vade.losses_test.items()):
+#     print(i)
+#     print(loss_name)
+#     print(type(loss_values))
+#     print(len(loss_values))
+
 
 runcell(1, 'C:/Users/pfbur/Box/projects/CFL-GIP/VaDE_code/Pytorch-VaDE/analysis.py')

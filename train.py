@@ -20,10 +20,11 @@ def weights_init_normal(m):
 class TrainerVaDE:
     """This is the trainer for the Variational Deep Embedding (VaDE).
     """
-    def __init__(self, args, device, dataloader):
+    def __init__(self, args, device, train_data, test_data):
         self.autoencoder = Autoencoder().to(device)
         self.VaDE = VaDE().to(device)
-        self.dataloader = dataloader
+        self.dataloader = train_data
+        self.test_dataloader = test_data
         self.device = device
         self.args = args
         self.losses = {'total': [], 
@@ -36,8 +37,20 @@ class TrainerVaDE:
                        'acc': []}
         self.training_stats = {'p_c': [],
                                'gamma_pred': []}
-
-
+        self.losses_test = {'total': [], 
+                       'mse_x': [], 
+                       'mse_y': [], 
+                       'log_p_z_given_c': [], 
+                       'log_p_c': [], 
+                       'log_q_c_given_x': [], 
+                       'log_q_z_given_x': [], 
+                       'acc': []}
+        self.training_stats_test = {'p_c': [],
+                               'gamma_pred': []}
+        self.vae_loss = {'loss': []}
+        self.vae_loss_test = {'loss': []}
+        
+        
 
     def pretrain(self):
         """Here we train an stacked autoencoder which will be used as the initialization for the VaDE. 
@@ -57,12 +70,20 @@ class TrainerVaDE:
                 x_hat = self.autoencoder(x)
                 # loss = F.binary_cross_entropy(x_hat, x, reduction='mean') # just reconstruction
                 loss = F.mse_loss(x_hat, x, reduction='mean')
-
-                # loss = F.mse_loss(x_hat, x, reduction='mean') # just reconstruction
                 loss.backward()
                 optimizer.step()
                 total_loss += loss.item()
-            print('Training Autoencoder... Epoch: {}, Loss: {}'.format(epoch, total_loss))
+            self.vae_loss['loss'].append(total_loss/len(self.dataloader))
+            self.autoencoder.eval()
+            with torch.no_grad():
+                total_loss = 0
+                for x, _ in self.test_dataloader:
+                    x = x.to(self.device)
+                    x_hat = self.autoencoder(x)
+                    # loss = F.binary_cross_entropy(x_hat, x, reduction='mean') # just reconstruction
+                    loss = F.mse_loss(x_hat, x, reduction='mean')
+                    total_loss += loss.item()
+                self.vae_loss_test['loss'].append(total_loss/len(self.test_dataloader))
         self.train_GMM() #training a GMM for initialize the VaDE
         self.save_weights_for_VaDE() #saving weights for the VaDE
 
@@ -138,8 +159,6 @@ class TrainerVaDE:
             self.optimizer.step()
             total_loss += loss.item()
             
-
-            
             for loss_name, loss_value in loss_components.items():
                 self.losses[loss_name].append(loss_value)
             for training_stats_name, training_stats_value in training_stats.items():
@@ -149,23 +168,29 @@ class TrainerVaDE:
         print('Training VaDE... Epoch: {}, Loss: {}'.format(epoch, total_loss))
 
 
-    def test_VaDE(self, epoch): 
+    def test_VaDE(self, epoch):
         self.VaDE.eval()
         with torch.no_grad():
             total_loss = 0
             y_true, y_pred = [], []
-            for x, true in self.dataloader:
+            for x, true_label in self.test_dataloader:
                 x = x.to(self.device)
                 x_hat, mu, log_var, z = self.VaDE(x)
+                # compute loss
                 if verbatim == 1:
                     print(f'testvade: shapes  of z, pi_prior: {z.shape}, {self.VaDE.pi_prior.shape}')
                 gamma = self.compute_gamma(z, torch.exp(self.VaDE.pi_prior))
                 pred = torch.argmax(gamma, dim=1)
-                loss, loss_components, _ = self.compute_loss(x, x_hat, mu, log_var, z, epoch, true)
+                loss, loss_components, training_stats = self.compute_loss(x, x_hat, mu, log_var, z, epoch, true_label)
                 total_loss += loss.item()
-                y_true.extend(true.numpy())
+                y_true.extend(true_label.numpy())
                 y_pred.extend(pred.cpu().detach().numpy())
-
+                for loss_name, loss_value in loss_components.items():
+                    # print(f'loss name in test vade is {loss_name}, {loss_value}')
+                    self.losses_test[loss_name].append(loss_value)
+                    # print(self.losses_test[loss_name])
+                for training_stats_name, training_stats_value in training_stats.items():
+                    self.training_stats_test[training_stats_name].append(training_stats_value)
             acc = self.cluster_acc(np.array(y_true), np.array(y_pred))
             # add accuracy to the loss components
             # print(acc)
