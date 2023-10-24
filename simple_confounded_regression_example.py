@@ -5,10 +5,14 @@ from sklearn.cluster import KMeans
 import pandas as pd
 
 # Set the number of samples n
-n = 10000
+n = 1000
 
 # Generate a one-dimensional confounder H
 H = np.random.normal(size=(n, 1))
+
+H = np.random.choice([-1, 0, 1], size=n, p=[1/3, 1/3, 1/3]).reshape(-1,1)
+
+# H = np.random.choice([-1, 1], size=n, p=[0.5, 0.5])
 
 # Generate cause X, which is influenced by H
 X = H + np.random.normal(size=(n, 1)) * 2

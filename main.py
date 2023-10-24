@@ -1,3 +1,4 @@
+# for _ in range(5):
 root_folder = 'C:/Users/pfbur/Box/projects/CFL-GIP/'
 import os
 os.chdir(root_folder + 'VaDE_code/Pytorch-VaDE')
@@ -26,9 +27,9 @@ from global_settings import *
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=500,
+    parser.add_argument("--epochs", type=int, default=30,
                         help="number of iterations")
-    parser.add_argument("--epochs_autoencoder", type=int, default=50,
+    parser.add_argument("--epochs_autoencoder", type=int, default=5,
                         help="number of epochs autoencoder")
     parser.add_argument("--patience", type=int, default=10, 
                         help="Patience for Early Stopping")
@@ -219,3 +220,4 @@ acc_list = loss_dict['acc']
 
 
 runcell(1, 'C:/Users/pfbur/Box/projects/CFL-GIP/VaDE_code/Pytorch-VaDE/analysis.py')
+runcell('deconfound', 'C:/Users/pfbur/Box/projects/CFL-GIP/VaDE_code/Pytorch-VaDE/analysis.py')
