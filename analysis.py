@@ -9,9 +9,54 @@ from hsic_torch import *
 # how to get the model params out?
 
 
+def fn_plot_hist_by_X(data, snippet):
+    # data must be n x 2 data frame, first column: X, second column Y
+    
+
+    # Generate labels like "1 (low X)" to "10 (high X)"
+    bin_labels = [f"{i+1} {'(low X)' if i == 0 else ('(high X)' if i == 9 else '')}" for i in range(10)]
+    
+    # Discretize the 'X' column into 10 bins and capture the bin edges
+    data['g'] = pd.cut(data['X'], bins=10, labels=bin_labels)
+    
+    # Reorder the categories of 'g' column to reverse the plot order
+    data['g'] = data['g'].cat.reorder_categories(bin_labels[::-1], ordered=True)
+    
+    import matplotlib.pyplot as plt
+    
+    # Setting up the figure and axes
+    fig, axs = plt.subplots(10, 1, figsize=(10, 20), sharex=True)
+    
+    # Get the unique values in 'g' to loop through
+    g_values = data['g'].cat.categories
+    
+    # Loop through each unique value in 'g' and plot on a separate axis
+    for i, g_val in enumerate(g_values):
+        subset = data[data['g'] == g_val]
+        axs[i].hist(subset['Y'], bins=30, color=sns.color_palette("cubehelix", 10)[i], edgecolor='black')
+        axs[i].set_title(f'{g_val}')
+        axs[i].set_ylabel('Frequency')
+    
+    # Set a common x-label
+    axs[-1].set_xlabel('Y Value')
+    
+    
+    # Add overall title to the figure
+    fig.suptitle(snippet, y=1.02)
+
+    
+    plt.tight_layout()
+    # plt.show()
+    
+    plt.savefig(plot_folder + "model" + time_str + "hist_deconf_" + snippet + ".pdf", bbox_inches='tight', dpi = 100)
+
+
+
+
 df_org = pd.read_csv('toy_data.csv')
 
-
+fn_plot_hist_by_X(pd.DataFrame(df_org[["X1", "Y"]]).rename(columns={"X1":"X"}), "orginal_data")
+    # data must be n x 2 data frame, first column: X, second column Y
 
 fig, axs = plt.subplots(2, 1, sharex=True, sharey=True)
 
@@ -58,7 +103,7 @@ yhat = xy_hat[:,dim_x:]
 z1 = z[:,:latent_dim_x]
 z2 = z[:,latent_dim_x:]
 
-
+#%%
 # are Z1 and Z2 dependent?
 
 ## this HSIC implementation is not working, test statistic scales with number of observations!!
@@ -100,12 +145,7 @@ plt.savefig(plot_folder + "model_" + time_str  + "_pairplot.pdf", bbox_inches='t
 x_cols = [col for col in df_org.columns if col.startswith('X')]
 #%%% run regressions
 
-
-
-
 # naive regression
-
-
 
 # Add a constant to the independent values
 X = sm.add_constant(df_org[x_cols])
@@ -148,21 +188,19 @@ print(model3.summary())
 
 #%% deconfound
 
-
 pi_c = vade.VaDE.pi_prior.detach().numpy()
 pi_c = np.clip(pi_c, a_min = 0, a_max = pi_c.max())
 pi_c = pi_c/pi_c.sum()
 mu_prior = vade.VaDE.mu_prior.detach().numpy() # size #C x #L
 log_var_prior = vade.VaDE.log_var_prior.detach().numpy()
-# var_prior = ###
-
-# prior for Z2
-# draw from categorical with proba pi_c
-draws = np.random.choice(np.arange(len(pi_c)), size = z1.shape[0], p=pi_c)
-
-# now use mu_prior and log_var_prior
 var_prior = np.exp(log_var_prior)
 
+##############################################################################################################
+# 1: sample new data, use observed X, ie. use Z1|X but sample Z2 from its prior
+##############################################################################################################
+# prior for Z2
+# draw from categorical with proba pi_c
+draws = np.random.choice(np.arange(len(pi_c)), size = z1.shape[0], p = pi_c)
 
 # get the means and variances for each draw
 means = mu_prior[draws]
@@ -176,9 +214,94 @@ posterior_z1_x = z1
 # feed through model
 
 
-xy_decode = vade.VaDE.decode(torch.cat((torch.from_numpy(posterior_z1_x), torch.from_numpy(prior_z2).float()), axis = 1))
-xy_decode = pd.DataFrame(xy_decode.detach().numpy())
+xy_decode_deconf_one_shot = vade.VaDE.decode(torch.cat((torch.from_numpy(posterior_z1_x), torch.from_numpy(prior_z2).float()), axis = 1))
+xy_decode_deconf_one_shot = pd.DataFrame(xy_decode_deconf_one_shot.detach().numpy())
 
+fn_plot_hist_by_X(pd.DataFrame(xy_decode_deconf_one_shot).rename(columns={0:"X", 1:"Y"}), "deconfounding_by_using_prior_Z2_one_shot")
+
+##############################################################################################################
+# 2: sample new data, use observed X, ie. use Z1|X but sample Z2 from its prior
+##############################################################################################################
+# prior for Z2
+# draw from categorical with proba pi_c
+factor_z2_samples = 100 # how many more samples from prior z2 do we want for each obs from posterior z1
+no_draws = z1.shape[0] * factor_z2_samples
+
+draws = np.random.choice(np.arange(len(pi_c)), size = no_draws, p=pi_c)
+# !!! question: dont I need to take the dependence between Z1 and Z2 into account here
+# shouldnt I use pi_c_conditional on x or conditional on z here?
+
+# get the means and variances for each draw
+means = mu_prior[draws]
+variances = var_prior[draws]
+
+# Generate samples
+prior_z2 = np.random.normal(loc=means, scale=np.sqrt(variances))[:,dim_x:]
+
+posterior_z1_x = z1
+
+# Duplicate the posterior_z1_x array
+duplicated_posterior_z1_x = np.vstack([posterior_z1_x] * factor_z2_samples)
+
+print(duplicated_posterior_z1_x.shape)  # This should output (20000, 1)
+
+# feed through model
+
+input_to_decoder = torch.cat((torch.from_numpy(duplicated_posterior_z1_x), torch.from_numpy(prior_z2).float()), axis = 1)
+xy_decode_deconf = vade.VaDE.decode(input_to_decoder)
+xy_decode_deconf = pd.DataFrame(xy_decode_deconf.detach().numpy())
+input_to_decoder = pd.DataFrame(input_to_decoder)
+
+# Convert the decoded results back to numpy for processing
+xy_decode_deconf_np = xy_decode_deconf.to_numpy()
+
+# First column remains the same
+x_part = xy_decode_deconf_np[:posterior_z1_x.shape[0], :dim_x]  # Taking every factor_z2_samples-th value from the 1st column
+
+# For the second column, reshape and then compute the mean along axis 1
+y_draws = xy_decode_deconf_np[:, -1:].reshape(factor_z2_samples, posterior_z1_x.shape[0])
+y_part = y_draws.mean(axis=0)
+
+# Combine the two columns to get the result
+xy_decode_deconf = np.column_stack((x_part, y_part))
+
+dfplot = pd.DataFrame(xy_decode_deconf).rename(columns = {0: "X", 1: "Y"})
+
+if dim_x == 1: fn_plot_hist_by_X(dfplot, "deconfounding_by_using_prior_Z2")
+
+
+
+
+print(dfplot.groupby('g').describe())
+
+##############################################################################################################
+# 3: sample new data, sample Z1 and Z2 from their priors
+##############################################################################################################
+# prior for Z2
+# draw from categorical with proba pi_c
+no_draws = z1.shape[0] * 2
+draws = np.random.choice(np.arange(len(pi_c)), size = no_draws, p=pi_c)
+
+# get the means and variances for each draw
+means = mu_prior[draws]
+variances = var_prior[draws]
+
+# Generate samples
+prior_z = np.random.normal(loc=means, scale=np.sqrt(variances))
+
+
+# feed through model
+xy_decode_new_samples = vade.VaDE.decode(torch.from_numpy(prior_z).float())
+xy_decode_new_samples = pd.DataFrame(xy_decode_new_samples.detach().numpy())
+
+
+
+fn_plot_hist_by_X(pd.DataFrame(xy_decode_new_samples).rename(columns={0:"X", 1:"Y"}), "both_Z1_and_Z2_from_priors")
+
+
+
+
+#%%
 # Get the number of 'X' columns
 xdim = len([col for col in df_obs.columns if col.startswith('X')])
 

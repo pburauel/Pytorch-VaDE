@@ -104,7 +104,7 @@ df = pd.DataFrame(df_dict)
 # scaler = StandardScaler()
 
 # # Select only the columns to be scaled
-# columns_to_scale = ['Y', 'Yint'] + [f'X{i+1}' for i in range(xdim)]
+# columns_to_scale = ['Y'] + [f'X{i+1}' for i in range(xdim)]
 # df_to_scale = df[columns_to_scale]
 
 # # Fit and transform the data
@@ -114,19 +114,19 @@ df = pd.DataFrame(df_dict)
 # df[columns_to_scale] = df_scaled
 
 
-# from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import MinMaxScaler
 
-# scaler = MinMaxScaler()
+scaler = MinMaxScaler()
 
-# # Select only the columns to be scaled
-# columns_to_scale = ['Y', 'Yint'] + [f'X{i+1}' for i in range(xdim)]
-# df_to_scale = df[columns_to_scale]
+# Select only the columns to be scaled
+columns_to_scale = ['Y'] + [f'X{i+1}' for i in range(xdim)]
+df_to_scale = df[columns_to_scale]
 
-# # Fit and transform the data
-# df_scaled = pd.DataFrame(scaler.fit_transform(df_to_scale), columns=columns_to_scale)
+# Fit and transform the data
+df_scaled = pd.DataFrame(scaler.fit_transform(df_to_scale), columns=columns_to_scale)
 
-# # Replace the original columns with the scaled ones
-# df[columns_to_scale] = df_scaled
+# Replace the original columns with the scaled ones
+df[columns_to_scale] = df_scaled
 
 
 print(df.head())
@@ -155,35 +155,33 @@ plt.show()
 
 
 
-
-marker_dict = {0: 'o', 1: 'x'}  # replace with your categories and markers
-
-fig, axs = plt.subplots(1, 2, figsize=(10, 6))
-
-
-# Left plot
-for h in range(2):
-    mask = df_plot["H"] == h
-    scatter = axs[0].scatter(df_plot["X1"][mask], df_plot["Y"][mask], marker=marker_dict[h], c=df_plot["L"][mask].squeeze(), cmap = 'PuOr', label=f'H={h}')
-
-scatter = axs[0].scatter(df_plot["X1"], df_plot["Yint"], c='green', edgecolors='black', label='Interventional')
+if xdim == 1:
+    marker_dict = {0: 'o', 1: 'x'}  # replace with your categories and markers
     
-axs[0].set_xlabel('Cause (X)')
-axs[0].set_ylabel('Outcome (Y)')
-axs[0].legend()
-axs[0].set_title('colored by confounder L')
-
-# Right plot
-axs[1].hist(df_plot["Y"], bins=30, alpha=0.5, orientation='horizontal', label='Y observational')
-axs[1].hist(df_plot["Yint"], bins=30, alpha=0.5, orientation='horizontal', label='Y interventional')
-axs[1].set_ylabel('Outcome (Y)')
-axs[1].set_xlabel('Frequency')
-axs[1].legend(loc='upper right')
-axs[1].set_title('')
-
-plt.tight_layout()
-
-plt.savefig(plot_folder + "on_dim_example" + ".pdf", bbox_inches='tight', dpi = 100)
+    fig, axs = plt.subplots(1, 2, figsize=(10, 6))
+    # Left plot
+    for h in range(2):
+        mask = df_plot["H"] == h
+        scatter = axs[0].scatter(df_plot["X1"][mask], df_plot["Y"][mask], marker=marker_dict[h], c=df_plot["L"][mask].squeeze(), cmap = 'PuOr', label=f'H={h}')
+    
+    scatter = axs[0].scatter(df_plot["X1"], df_plot["Yint"], c='green', edgecolors='black', label='Interventional')
+        
+    axs[0].set_xlabel('Cause (X)')
+    axs[0].set_ylabel('Outcome (Y)')
+    axs[0].legend()
+    axs[0].set_title('colored by confounder L')
+    
+    # Right plot
+    axs[1].hist(df_plot["Y"], bins=30, alpha=0.5, orientation='horizontal', label='Y observational')
+    axs[1].hist(df_plot["Yint"], bins=30, alpha=0.5, orientation='horizontal', label='Y interventional')
+    axs[1].set_ylabel('Outcome (Y)')
+    axs[1].set_xlabel('Frequency')
+    axs[1].legend(loc='upper right')
+    axs[1].set_title('')
+    
+    plt.tight_layout()
+    
+    plt.savefig(plot_folder + "on_dim_example" + ".pdf", bbox_inches='tight', dpi = 100)
 
 
 

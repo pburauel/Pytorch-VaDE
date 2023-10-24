@@ -27,7 +27,7 @@ from global_settings import *
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=30,
+    parser.add_argument("--epochs", type=int, default=10,
                         help="number of iterations")
     parser.add_argument("--epochs_autoencoder", type=int, default=5,
                         help="number of epochs autoencoder")
