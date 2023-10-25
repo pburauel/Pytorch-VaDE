@@ -1,6 +1,8 @@
 import torch
 from torch.utils.data import DataLoader, TensorDataset, random_split
 import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
+import pickle
 
 def get_toy_data(batch_size):
     # Load the data from the CSV file
@@ -23,8 +25,20 @@ def get_toy_data(batch_size):
     # Combine the X tensors and Y into a single tensor
     X = torch.stack(X_tensors + [Y], dim=1)
     
+    # scale observed X here, and save scaler
+    
+    scaler = MinMaxScaler(feature_range=(0, 1))
+    
+    # Fit and transform the data
+    scaled_data = scaler.fit_transform(X)
+    
+    with open('scaler.pkl', 'wb') as f:
+        pickle.dump(scaler, f)
+    
+    # plt.scatter(X[:,0], scaled_data[:,0])
+    
     # Combine the tensors into a single dataset
-    dataset = TensorDataset(X, HL)
+    dataset = TensorDataset(torch.tensor(scaled_data).float(), HL)
     
     # Define the size of the train and test datasets
     train_size = int(0.1 * len(dataset))

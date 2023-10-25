@@ -50,6 +50,20 @@ def fn_plot_hist_by_X(data, snippet):
     
     plt.savefig(plot_folder + "model" + time_str + "hist_deconf_" + snippet + ".pdf", bbox_inches='tight', dpi = 100)
 
+# load data scaler
+# Load the scaler from the saved file
+with open('scaler.pkl', 'rb') as f:
+    loaded_scaler = pickle.load(f)
+
+# Invert the scaling
+
+print(inverted_data)
+# Load the scaler from the saved file
+with open('scaler.pkl', 'rb') as f:
+    loaded_scaler = pickle.load(f)
+
+# Invert the scaling
+inverted_data = loaded_scaler.inverse_transform(scaled_data)
 
 
 
@@ -58,30 +72,13 @@ df_org = pd.read_csv('toy_data.csv')
 fn_plot_hist_by_X(pd.DataFrame(df_org[["X1", "Y"]]).rename(columns={"X1":"X"}), "orginal_data")
     # data must be n x 2 data frame, first column: X, second column Y
 
-fig, axs = plt.subplots(2, 1, sharex=True, sharey=True)
-
-# Plot the observational distribution of Y
-axs[0].hist(df_org["Y"], bins=30, alpha=0.5)
-axs[0].set_title('Observational')
-
-# Plot the true interventional distribution of Y
-axs[1].hist(df_org["Yint"], bins=30, alpha=0.5)
-axs[1].set_title('True Interventional')
-
-
-axs[1].set_xlabel('Y')
-
-
-# Adjust the spacing between subplots
-plt.subplots_adjust(hspace=0.5)
-
-plt.show()
-
-
-df_obs = df_org[[col for col in df_org.columns if col.startswith('X') or col == 'Y']]
 
 
 
+# Get all columns that start with 'X'
+x_cols = [col for col in df_org.columns if col.startswith('X')]
+
+df_obs = df_org[x_cols + ['Y']]
 
 
 # feed through model
@@ -95,6 +92,10 @@ xy_hat, mu, log_var, z = vade.VaDE(torch.from_numpy(df_obs.values).float())
 
 # df_org = df_org.numpy()
 xy_hat = xy_hat.detach().numpy()
+
+xy_hat_inverted = loaded_scaler.inverse_transform(xy_hat)
+
+
 z = z.detach().numpy()
 
 xhat = xy_hat[:,:dim_x]
@@ -102,6 +103,9 @@ yhat = xy_hat[:,dim_x:]
 
 z1 = z[:,:latent_dim_x]
 z2 = z[:,latent_dim_x:]
+
+# plt.hist(z1)
+plt.hist(log_var.detach().numpy())
 
 #%%
 # are Z1 and Z2 dependent?
@@ -141,8 +145,6 @@ sns.pairplot(df_xy_xyhat)
 # Save the figure
 plt.savefig(plot_folder + "model_" + time_str  + "_pairplot.pdf", bbox_inches='tight', dpi = 100)
 
-# Get all columns that start with 'X'
-x_cols = [col for col in df_org.columns if col.startswith('X')]
 #%%% run regressions
 
 # naive regression
@@ -224,6 +226,7 @@ fn_plot_hist_by_X(pd.DataFrame(xy_decode_deconf_one_shot).rename(columns={0:"X",
 ##############################################################################################################
 # prior for Z2
 # draw from categorical with proba pi_c
+z1_samples = 10
 factor_z2_samples = 100 # how many more samples from prior z2 do we want for each obs from posterior z1
 no_draws = z1.shape[0] * factor_z2_samples
 
@@ -237,6 +240,8 @@ variances = var_prior[draws]
 
 # Generate samples
 prior_z2 = np.random.normal(loc=means, scale=np.sqrt(variances))[:,dim_x:]
+
+
 
 posterior_z1_x = z1
 

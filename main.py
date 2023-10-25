@@ -1,4 +1,4 @@
-# for _ in range(5):
+# for _ in range(10):
 root_folder = 'C:/Users/pfbur/Box/projects/CFL-GIP/'
 import os
 os.chdir(root_folder + 'VaDE_code/Pytorch-VaDE')
@@ -27,15 +27,15 @@ from global_settings import *
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=10,
+    parser.add_argument("--epochs", type=int, default=200,
                         help="number of iterations")
-    parser.add_argument("--epochs_autoencoder", type=int, default=5,
+    parser.add_argument("--epochs_autoencoder", type=int, default=50,
                         help="number of epochs autoencoder")
     parser.add_argument("--patience", type=int, default=10, 
                         help="Patience for Early Stopping")
     parser.add_argument('--lr', type=float, default=1e-3,
                         help='learning rate')
-    parser.add_argument("--batch_size", type=int, default=100, 
+    parser.add_argument("--batch_size", type=int, default=200, # works well with 100
                         help="Batch size")
     parser.add_argument('--pretrain', type=bool, default=True,
                         help='learning rate')
@@ -168,7 +168,7 @@ def plot_losses(self):
 
     plt.tight_layout()
     plt.show()
-    fig.savefig(plot_folder + "model_" + time_str  + "_losses.pdf", 
+    fig.savefig(plot_folder + "model" + time_str  + "_losses.pdf", 
                 bbox_inches='tight',
                 dpi = 333)   # save the figure to file     
     

@@ -114,19 +114,19 @@ df = pd.DataFrame(df_dict)
 # df[columns_to_scale] = df_scaled
 
 
-from sklearn.preprocessing import MinMaxScaler
+# from sklearn.preprocessing import MinMaxScaler
 
-scaler = MinMaxScaler()
+# scaler = MinMaxScaler()
 
-# Select only the columns to be scaled
-columns_to_scale = ['Y'] + [f'X{i+1}' for i in range(xdim)]
-df_to_scale = df[columns_to_scale]
+# # Select only the columns to be scaled
+# columns_to_scale = ['Y'] + [f'X{i+1}' for i in range(xdim)]
+# df_to_scale = df[columns_to_scale]
 
-# Fit and transform the data
-df_scaled = pd.DataFrame(scaler.fit_transform(df_to_scale), columns=columns_to_scale)
+# # Fit and transform the data
+# df_scaled = pd.DataFrame(scaler.fit_transform(df_to_scale), columns=columns_to_scale)
 
-# Replace the original columns with the scaled ones
-df[columns_to_scale] = df_scaled
+# # Replace the original columns with the scaled ones
+# df[columns_to_scale] = df_scaled
 
 
 print(df.head())
