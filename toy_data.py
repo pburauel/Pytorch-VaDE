@@ -83,6 +83,13 @@ np.var(Y)
 
 Yint = (betaL + np.sum(X, axis=1) + UY + np.sum(X, axis=1) + UY)/2
 
+Yint_draws = []
+for UYdraw in range(100):
+    UYi = np.random.normal(0,.1, size=X.shape[0])
+    Yint = (betaL + np.sum(X, axis=1) + UYi + np.sum(X, axis=1) + UYi)/2
+    Yint_draws.append(Yint)
+Yint_avg = np.mean(np.array(Yint_draws), axis = 0)
+
 
 # Create a DataFrame for easier plotting
 df_dict = {
@@ -90,7 +97,8 @@ df_dict = {
     'L': L,
     'HL': HL,
     'Y': Y,
-    'Yint': Yint
+    'Yint': Yint,
+    'Yint_avg': Yint_avg
 }
 for i in range(xdim):
     df_dict[f'X{i+1}'] = X[:, i]

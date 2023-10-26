@@ -57,7 +57,6 @@ if __name__ == '__main__':
 
 ### plot autoencoder losses
 
-
 fig, axs = plt.subplots(figsize=(10, 9))  # Create a figure and a set of subplots
 
 axs.plot(vade.vae_loss['loss'], label='train')  # Assuming 'vade.vae_loss' and 'vade.vae_loss_test' are dictionaries with key 'loss'

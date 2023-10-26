@@ -50,28 +50,19 @@ def fn_plot_hist_by_X(data, snippet):
     
     plt.savefig(plot_folder + "model" + time_str + "hist_deconf_" + snippet + ".pdf", bbox_inches='tight', dpi = 100)
 
-# load data scaler
+
 # Load the scaler from the saved file
 with open('scaler.pkl', 'rb') as f:
     loaded_scaler = pickle.load(f)
-
-# Invert the scaling
-
-print(inverted_data)
-# Load the scaler from the saved file
-with open('scaler.pkl', 'rb') as f:
-    loaded_scaler = pickle.load(f)
-
-# Invert the scaling
-inverted_data = loaded_scaler.inverse_transform(scaled_data)
 
 
 
 df_org = pd.read_csv('toy_data.csv')
 
-fn_plot_hist_by_X(pd.DataFrame(df_org[["X1", "Y"]]).rename(columns={"X1":"X"}), "orginal_data")
+fn_plot_hist_by_X(pd.DataFrame(df_org[["X1", "Y"]]).rename(columns={"X1":"X"}), "orginal_data_confounded")
     # data must be n x 2 data frame, first column: X, second column Y
 
+fn_plot_hist_by_X(pd.DataFrame(df_org[["X1", "Yint"]]).rename(columns={"X1":"X", "Yint": 'Y'}), "true_interventional")
 
 
 
@@ -226,54 +217,72 @@ fn_plot_hist_by_X(pd.DataFrame(xy_decode_deconf_one_shot).rename(columns={0:"X",
 ##############################################################################################################
 # prior for Z2
 # draw from categorical with proba pi_c
-z1_samples = 10
-factor_z2_samples = 100 # how many more samples from prior z2 do we want for each obs from posterior z1
+z1_samples = 50
+z2_samples = 100# how many more samples from prior z2 do we want for each obs from posterior z1
 no_draws = z1.shape[0] * factor_z2_samples
 
-draws = np.random.choice(np.arange(len(pi_c)), size = no_draws, p=pi_c)
+
 # !!! question: dont I need to take the dependence between Z1 and Z2 into account here
 # shouldnt I use pi_c_conditional on x or conditional on z here?
+def generate_prior_z2():
+    draws = np.random.choice(np.arange(len(pi_c)), size=z1.shape[0], p=pi_c)
+    means = mu_prior[draws]
+    variances = var_prior[draws]
+    return np.random.normal(loc=means, scale=np.sqrt(variances))[:, dim_x:]
 
-# get the means and variances for each draw
-means = mu_prior[draws]
-variances = var_prior[draws]
-
-# Generate samples
-prior_z2 = np.random.normal(loc=means, scale=np.sqrt(variances))[:,dim_x:]
+prior_z2_dict = {i: generate_prior_z2() for i in range(factor_z2_samples)}
 
 
+def generate_posterior_z1():
+    _, _, _, z = vade.VaDE(torch.from_numpy(df_obs.values).float())
+    z1 = z[:,:latent_dim_x]
+    return z1.detach().numpy()
 
-posterior_z1_x = z1
+posterior_z1_dict = {i: generate_posterior_z1() for i in range(z1_samples)}
 
-# Duplicate the posterior_z1_x array
-duplicated_posterior_z1_x = np.vstack([posterior_z1_x] * factor_z2_samples)
-
-print(duplicated_posterior_z1_x.shape)  # This should output (20000, 1)
 
 # feed through model
+# for each posterior_z1
+all_draws = []
+for i_post_z1 in range(z1_samples):
+    posterior_z1 = generate_posterior_z1()
+    y_draws = []
+    for j_prior_z2 in range(z2_samples):
+        prior_z2 = generate_prior_z2()
+        
+        input_to_decoder = torch.cat((torch.from_numpy(posterior_z1), torch.from_numpy(prior_z2).float()), axis = 1)
+        xy_decode_deconf = vade.VaDE.decode(input_to_decoder)
+        
+        xy_decode_deconf = pd.DataFrame(xy_decode_deconf.detach().numpy())
 
-input_to_decoder = torch.cat((torch.from_numpy(duplicated_posterior_z1_x), torch.from_numpy(prior_z2).float()), axis = 1)
-xy_decode_deconf = vade.VaDE.decode(input_to_decoder)
-xy_decode_deconf = pd.DataFrame(xy_decode_deconf.detach().numpy())
-input_to_decoder = pd.DataFrame(input_to_decoder)
+        # Convert the decoded results back to numpy for processing
+        xy_decode_deconf_np = xy_decode_deconf.to_numpy()
+        # invert scaling
+        xy_decode_deconf_np = loaded_scaler.inverse_transform(xy_decode_deconf_np)
 
-# Convert the decoded results back to numpy for processing
-xy_decode_deconf_np = xy_decode_deconf.to_numpy()
+        
+        # First column remains the same
+        x_part = xy_decode_deconf_np[:, :dim_x]  # Taking every factor_z2_samples-th value from the 1st column
 
-# First column remains the same
-x_part = xy_decode_deconf_np[:posterior_z1_x.shape[0], :dim_x]  # Taking every factor_z2_samples-th value from the 1st column
+        # For the second column, reshape and then compute the mean along axis 1
+        y_part = xy_decode_deconf_np[:, -1:]#.reshape(factor_z2_samples, posterior_z1_x.shape[0])
+        y_draws.append(y_part)
+    y_draws_np = np.array(y_draws)
+    y_mean = np.mean(y_draws, axis = 0)
+    
+    xy_decode_deconf = np.column_stack((x_part, y_mean))
+    all_draws.append(xy_decode_deconf)
 
-# For the second column, reshape and then compute the mean along axis 1
-y_draws = xy_decode_deconf_np[:, -1:].reshape(factor_z2_samples, posterior_z1_x.shape[0])
-y_part = y_draws.mean(axis=0)
+reshaped_draws = np.array(all_draws).reshape(-1, 2)
 
-# Combine the two columns to get the result
-xy_decode_deconf = np.column_stack((x_part, y_part))
 
-dfplot = pd.DataFrame(xy_decode_deconf).rename(columns = {0: "X", 1: "Y"})
+
+dfplot = pd.DataFrame(reshaped_draws).rename(columns = {0: "X", 1: "Y"})
 
 if dim_x == 1: fn_plot_hist_by_X(dfplot, "deconfounding_by_using_prior_Z2")
 
+
+### !!! compute MSE function
 
 
 
