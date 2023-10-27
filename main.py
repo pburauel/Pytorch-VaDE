@@ -1,4 +1,4 @@
-for wr in [1, 10, 100, 1000, 1, 10, 100, 1000]:
+for wr in [1, 1, 1, 1, 1, 1]:
 # wr = 10
     root_folder = 'C:/Users/pfbur/Box/projects/CFL-GIP/'
     import os
@@ -113,7 +113,7 @@ for wr in [1, 10, 100, 1000, 1, 10, 100, 1000]:
          'log_p_c': 'max', 
          'log_q_c_given_x': 'min', 
          'log_q_z_given_x': 'min', 
-         'acc': 'min'})
+         'acc': 'min'}) # this is just to make the loss plot visually easier to understand: all pieces of the loss should go DOWN now
     
     def plot_losses(self):
         num_plots = len(self.losses)
@@ -175,13 +175,6 @@ for wr in [1, 10, 100, 1000, 1, 10, 100, 1000]:
     
     
     
-    
-    import matplotlib.pyplot as plt
-    import numpy as np
-    
-    
-    
-    
     loss_dict = vade.losses
     
     def min_max_dict(d):
@@ -197,25 +190,8 @@ for wr in [1, 10, 100, 1000, 1, 10, 100, 1000]:
     min_max.columns = ['Min', 'Max']
     print(min_max)
     
-    # for item in loss_dict.items():
-    #     print(len(item[1]))
-    
-    loss_df = pd.DataFrame(loss_dict)
     
     acc_list = loss_dict['acc']
-    
-    
-    # for i, (loss_name, loss_values) in enumerate(vade.losses.items()):
-    #     print(i)
-    #     print(loss_name)
-    #     print(type(loss_values))
-    #     print(len(loss_values))
-    
-    # for i, (loss_name, loss_values) in enumerate(vade.losses_test.items()):
-    #     print(i)
-    #     print(loss_name)
-    #     print(type(loss_values))
-    #     print(len(loss_values))
     
     
     runcell(1, 'C:/Users/pfbur/Box/projects/CFL-GIP/VaDE_code/Pytorch-VaDE/analysis.py')
