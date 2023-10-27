@@ -90,7 +90,8 @@ class VaDE(torch.nn.Module):
         hy = F.relu(self.fc4y(z)) # the whole z vector is mapped to y
         hy = F.relu(self.fc5y(hy))
         hy = F.relu(self.fc6y(hy))
-        return torch.cat((self.fc7x(hx), self.fc7y(hy)), dim = 1)
+        # return torch.cat((self.fc7x(hx), self.fc7y(hy)), dim = 1)
+        return torch.sigmoid(torch.cat((self.fc7x(hx), self.fc7y(hy)), dim = 1))
 
     def reparameterize(self, mu, log_var):
         std = torch.exp(log_var/2)

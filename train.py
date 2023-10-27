@@ -228,8 +228,10 @@ class TrainerVaDE:
             # print(f'epoch is {epoch} of {no_epochs}, weight is {weight}')
             
         # log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') 
-        mse_x = F.mse_loss(x_hat, x, reduction='sum')
-        mse_y = F.mse_loss(y_hat, y, reduction='sum') # used to be called log_p_x_given_z 
+        mse_x = F.binary_cross_entropy(x_hat, x, reduction='sum') 
+        mse_y = F.binary_cross_entropy(y_hat, y, reduction='sum') 
+        # mse_x = F.mse_loss(x_hat, x, reduction='sum')
+        # mse_y = F.mse_loss(y_hat, y, reduction='sum') # used to be called log_p_x_given_z 
         h = log_var.exp().unsqueeze(1) + (mu.unsqueeze(1) - self.VaDE.mu_prior).pow(2) # mu here needs the same dimensionality as VaDE.mu_prior
         h = torch.sum(self.VaDE.log_var_prior + h / self.VaDE.log_var_prior.exp(), dim=2) # obs x n_classes x latent_dim
         log_p_z_given_c = 0.5 * torch.sum(gamma * h) # ok, see eq. B --- SCALAR
