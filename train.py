@@ -203,7 +203,7 @@ class TrainerVaDE:
         no_epochs = self.args.epochs
         weight = self.compute_weight(no_epochs, epoch)
         weight2 = self.compute_weight2(no_epochs, epoch)
-        weights = self.compute_weights(no_epochs, epoch, no_weights = 9)
+        weights = self.compute_weights(no_epochs, epoch, no_weights = 3)
         x = xy[:, :dim_x] # selects the first dim_x columns
         y = xy[:, dim_x:] # selects the remaining columns
         x_hat = xy_hat[:, :dim_x] # selects the first dim_x columns
@@ -228,8 +228,6 @@ class TrainerVaDE:
             # print(f'epoch is {epoch} of {no_epochs}, weight is {weight}')
             
         # log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') 
-        # mse_x = F.binary_cross_entropy(x_hat, x, reduction='sum') 
-        # mse_y = F.binary_cross_entropy(y_hat, y, reduction='sum') 
         mse_x = F.mse_loss(x_hat, x, reduction='sum')
         mse_y = F.mse_loss(y_hat, y, reduction='sum') # used to be called log_p_x_given_z 
         h = log_var.exp().unsqueeze(1) + (mu.unsqueeze(1) - self.VaDE.mu_prior).pow(2) # mu here needs the same dimensionality as VaDE.mu_prior
@@ -239,8 +237,7 @@ class TrainerVaDE:
         log_q_c_given_x = torch.sum(gamma * torch.log(gamma + 1e-9)) # eq. E in Appendix
         log_q_z_given_x = -0.5 * torch.sum(1 + log_var) # ok, see eq. D in App., added a minus sign here and changed the sign for this component in the overall loss (original code is fine, this is just for better readability)
 
-        self.args.weight_regulariser
-        loss = 10000 * mse_x + 10000 * weights[1] * mse_y + self.args.weight_regulariser * weights[2] * log_p_z_given_c - self.args.weight_regulariser * weights[4] * log_p_c + self.args.weight_regulariser * weights[4] * log_q_c_given_x + self.args.weight_regulariser * weights[4] * log_q_z_given_x # changed the signs, 
+        loss = 1000 * mse_x + 1000 * weights[1] * mse_y + weights[2] * log_p_z_given_c - weights[2] * log_p_c + weights[2] * log_q_c_given_x + weights[2] * log_q_z_given_x # changed the signs, 
         # loss = mse_x + weights[1] * mse_y #- weight* log_p_c #+ weight * log_p_z_given_c #+ log_q_c_given_x + log_q_z_given_x # changed the signs, 
         # loss = loss - weights[2] * log_p_c + weights[3] * log_p_z_given_c + weights[6] * log_q_c_given_x 
         # loss = mse_x +  weights[1] * mse_y +  weights[2] * log_p_z_given_c -  weights[3] * log_p_c +  weights[4] * log_q_c_given_x +  weights[5] *  log_q_z_given_x

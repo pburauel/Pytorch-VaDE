@@ -20,11 +20,11 @@ n_samples = 10000
 
 ## option 1 to generate H and L
 # Define the joint probability matrix M for H and L
-alpha = 0.6 # can be between 0 and 1
+alpha = 0.8 # can be between 0 and 1
 beta = alpha - 0.01
 gamma = 0.4
-M = np.array([[0.5 - (1-alpha)/2, 0.5 - (alpha/2)],  # Probabilities for L=0
-              [0.5 - (beta/2), 0.5 - (1-beta)/2]]) # Probabilities for L=1
+M = np.array([[0.5 - (alpha/2), 0.5 - (1-alpha)/2],  # Probabilities for L=0
+              [0.5 - (1-beta)/2, 0.5 - (beta/2)]]) # Probabilities for L=1
 
 # M = np.array([[0.5 - (alpha/2), 0.5 - (1-alpha)/2 - gamma],  # Probabilities for L=0
 #               [0.5 + (gamma/2) - (1-beta)/2, 0.5  + (gamma/2) - (beta/2)]]) # Probabilities for L=1
