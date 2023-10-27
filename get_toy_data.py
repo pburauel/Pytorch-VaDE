@@ -41,7 +41,7 @@ def get_toy_data(batch_size):
     dataset = TensorDataset(torch.tensor(scaled_data).float(), HL)
     
     # Define the size of the train and test datasets
-    train_size = int(0.1 * len(dataset))
+    train_size = int(.95 * len(dataset))
     test_size = len(dataset) - train_size
 
     # Create the train and test datasets
@@ -51,5 +51,4 @@ def get_toy_data(batch_size):
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
     return train_loader, test_loader
-
 

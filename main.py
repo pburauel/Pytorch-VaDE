@@ -29,13 +29,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int, default=200,
                         help="number of iterations")
-    parser.add_argument("--epochs_autoencoder", type=int, default=50,
+    parser.add_argument("--epochs_autoencoder", type=int, default=200,
                         help="number of epochs autoencoder")
     parser.add_argument("--patience", type=int, default=10, 
                         help="Patience for Early Stopping")
-    parser.add_argument('--lr', type=float, default=1e-3,
+    parser.add_argument('--lr', type=float, default=1e-4,
                         help='learning rate')
-    parser.add_argument("--batch_size", type=int, default=200, # works well with 100
+    parser.add_argument("--batch_size", type=int, default=100, # works well with 100
                         help="Batch size")
     parser.add_argument('--pretrain', type=bool, default=True,
                         help='learning rate')
@@ -48,7 +48,6 @@ if __name__ == '__main__':
 
     # dataloader = get_mnist(batch_size=args.batch_size)
     train_loader, test_loader = get_toy_data(batch_size=args.batch_size)
-    
     vade = TrainerVaDE(args, device, train_loader, test_loader)
     if args.pretrain==True:
         vade.pretrain()
@@ -219,4 +218,5 @@ acc_list = loss_dict['acc']
 
 
 runcell(1, 'C:/Users/pfbur/Box/projects/CFL-GIP/VaDE_code/Pytorch-VaDE/analysis.py')
+runcell('pairplots', 'C:/Users/pfbur/Box/projects/CFL-GIP/VaDE_code/Pytorch-VaDE/analysis.py')
 runcell('deconfound', 'C:/Users/pfbur/Box/projects/CFL-GIP/VaDE_code/Pytorch-VaDE/analysis.py')

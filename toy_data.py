@@ -60,8 +60,8 @@ xdim = 1  # or 1, or any other positive integer
 
 X = np.zeros((n_samples, xdim))
 
-H0loc = -2
-H1loc = 2
+H0loc = 2
+H1loc = 4
 
 if xdim > 1:
     cov = 0.5 * np.eye(xdim)  # Covariance matrix
@@ -144,7 +144,7 @@ df.to_csv('toy_data.csv', index=False)
 
 
 # take a sample for plotting
-df_plot = df.sample(n=1000, random_state=1).reset_index(drop = True)
+df_plot = df.sample(n=min(1000,n_samples), random_state=1).reset_index(drop = True)
 
 
 # marker_dict = {0: "s", 1: "X"} # replace with your actual team names and desired markers

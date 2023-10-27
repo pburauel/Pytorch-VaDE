@@ -3,7 +3,7 @@ import seaborn as sns
 import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
-
+import pickle
 
 from hsic_torch import *
 # how to get the model params out?
@@ -51,6 +51,8 @@ def fn_plot_hist_by_X(data, snippet):
     plt.savefig(plot_folder + "model" + time_str + "hist_deconf_" + snippet + ".pdf", bbox_inches='tight', dpi = 100)
 
 
+
+
 # Load the scaler from the saved file
 with open('scaler.pkl', 'rb') as f:
     loaded_scaler = pickle.load(f)
@@ -73,8 +75,65 @@ df_obs = df_org[x_cols + ['Y']]
 
 
 # feed through model
-xy_hat, mu, log_var, z = vade.VaDE(torch.from_numpy(df_obs.values).float())
+vade.VaDE.eval()
+with torch.no_grad():
+    xy_hat, mu, log_var, z = vade.VaDE.forward(torch.from_numpy(df_obs.values).float())
 
+t1 = xy_hat[:, 0].detach().numpy().reshape(-1,1).copy()
+t2 = np.array(df_obs[["X1"]]).copy()
+diff = abs(t1 - t2)
+condition = diff <= 0.1
+
+# Count the number of differences not more than 0.01
+count = np.sum(condition == True)
+
+# Get the indices of the rows that meet the condition
+indices = condition == 1
+
+print("Count:", count)
+
+plt.scatter(t1, t2)
+# plt.scatter(t1[indices], t2[indices], c = 'red')
+
+
+### feed scaled data
+# feed through model
+# from sklearn.preprocessing import MinMaxScaler
+
+# scaler = MinMaxScaler(feature_range=(0, 1))
+
+# # Fit and transform the data
+# scaled_data = scaler.fit_transform(df_obs.values)
+# # scaled_data = df_obs.values
+# plt.hist(df_obs.values[:,0], bins = 30)
+# plt.hist(scaled_data[:,0], bins = 30)
+
+
+# vade.VaDE.eval()
+# with torch.no_grad():
+#     xy_hat_sc, _, _, _ = vade.VaDE.forward(torch.from_numpy(scaled_data).float())
+
+# t1 = xy_hat_sc[:, 0].detach().numpy().reshape(-1,1).copy()
+# t2 = np.array(scaled_data[:,0]).copy()
+# plt.scatter(t1, t2)
+# plt.scatter(t1[indices], t2[indices], c = 'red')
+
+
+
+# vade.VaDE.eval()
+# with torch.no_grad():
+#     for _ in range(100):
+#         xy_hat, mu, log_var, z = vade.VaDE(torch.from_numpy(df_obs.values).float())
+#         xy_hat_accum += xy_hat
+#         mu_accum += mu
+#         log_var_accum += log_var
+#         z_accum += z
+
+# # Average the accumulators
+# xy_hat = xy_hat_accum / 100
+# mu = mu_accum / 100
+# log_var = log_var_accum / 100
+# z = z_accum / 100
 
 
 
@@ -96,9 +155,19 @@ z1 = z[:,:latent_dim_x]
 z2 = z[:,latent_dim_x:]
 
 # plt.hist(z1)
-plt.hist(log_var.detach().numpy())
+# plt.hist(log_var.detach().numpy())
 
-#%%
+#%% check_VAE
+
+vade.autoencoder.eval()
+pred_ae = vade.autoencoder.forward(torch.from_numpy(df_obs.values).float())
+
+t1 = df_obs.values[:,1]
+t2 = pred_ae[:,1]
+plt.scatter(t1, t2.detach().numpy())
+
+plt.scatter(t1[indices], t2.detach().numpy()[indices], c = 'red')
+#%% pairplots
 # are Z1 and Z2 dependent?
 
 ## this HSIC implementation is not working, test statistic scales with number of observations!!
@@ -125,16 +194,22 @@ df_obs_z.columns = col_names
 # how good is the reconstruction?
 # X, Y against Xhat, Yhat
 df_xy_xyhat = pd.concat((pd.DataFrame(df_obs), pd.DataFrame(xy_hat)), axis = 1)
-df_xy_xyhat.columns = ["X"+str(i+1) for i in range(dim_x)] + ["Y"] + ["Xhat"+str(i+1) for i in range(latent_dim_x)] + ["Yhat"]
+df_xy_xyhat.columns = ["X"+str(i+1) for i in range(dim_x)] + ["Y"] + ["Xhat"+str(i+1) for i in range(dim_x)] + ["Yhat"]
 
 # Set the figure size
 plt.figure(figsize=(3,3))  # You can adjust the values as per your requirement
-
-# Your plot code here
 sns.pairplot(df_xy_xyhat)
-
-# Save the figure
 plt.savefig(plot_folder + "model_" + time_str  + "_pairplot.pdf", bbox_inches='tight', dpi = 100)
+
+
+# # X, Y against Xhat, Yhat - but rescale everthing first
+# df_xy_xyhat_sc = pd.concat((pd.DataFrame(loaded_scaler.transform(df_obs)), pd.DataFrame(loaded_scaler.transform(xy_hat))), axis = 1)
+# df_xy_xyhat_sc.columns = ["X"+str(i+1) for i in range(dim_x)] + ["Y"] + ["Xhat"+str(i+1) for i in range(dim_x)] + ["Yhat"]
+# sns.pairplot(df_xy_xyhat_sc)
+
+
+# # Save the figure
+# plt.savefig(plot_folder + "model_" + time_str  + "_pairplot_sc.pdf", bbox_inches='tight', dpi = 100)
 
 #%%% run regressions
 
@@ -180,13 +255,14 @@ print(model3.summary())
 
 
 #%% deconfound
-
-pi_c = vade.VaDE.pi_prior.detach().numpy()
-pi_c = np.clip(pi_c, a_min = 0, a_max = pi_c.max())
-pi_c = pi_c/pi_c.sum()
-mu_prior = vade.VaDE.mu_prior.detach().numpy() # size #C x #L
-log_var_prior = vade.VaDE.log_var_prior.detach().numpy()
-var_prior = np.exp(log_var_prior)
+vade.VaDE.eval()
+with torch.no_grad():
+    pi_c = vade.VaDE.pi_prior.detach().numpy()
+    pi_c = np.clip(pi_c, a_min = 0, a_max = pi_c.max())
+    pi_c = pi_c/pi_c.sum()
+    mu_prior = vade.VaDE.mu_prior.detach().numpy() # size #C x #L
+    log_var_prior = vade.VaDE.log_var_prior.detach().numpy()
+    var_prior = np.exp(log_var_prior)
 
 ##############################################################################################################
 # 1: sample new data, use observed X, ie. use Z1|X but sample Z2 from its prior
@@ -206,8 +282,9 @@ posterior_z1_x = z1
 
 # feed through model
 
-
-xy_decode_deconf_one_shot = vade.VaDE.decode(torch.cat((torch.from_numpy(posterior_z1_x), torch.from_numpy(prior_z2).float()), axis = 1))
+vade.VaDE.eval()
+with torch.no_grad():
+    xy_decode_deconf_one_shot = vade.VaDE.decode(torch.cat((torch.from_numpy(posterior_z1_x), torch.from_numpy(prior_z2).float()), axis = 1))
 xy_decode_deconf_one_shot = pd.DataFrame(xy_decode_deconf_one_shot.detach().numpy())
 
 fn_plot_hist_by_X(pd.DataFrame(xy_decode_deconf_one_shot).rename(columns={0:"X", 1:"Y"}), "deconfounding_by_using_prior_Z2_one_shot")
@@ -219,7 +296,7 @@ fn_plot_hist_by_X(pd.DataFrame(xy_decode_deconf_one_shot).rename(columns={0:"X",
 # draw from categorical with proba pi_c
 z1_samples = 50
 z2_samples = 100# how many more samples from prior z2 do we want for each obs from posterior z1
-no_draws = z1.shape[0] * factor_z2_samples
+# no_draws = z1.shape[0] * factor_z2_samples
 
 
 # !!! question: dont I need to take the dependence between Z1 and Z2 into account here
@@ -230,15 +307,17 @@ def generate_prior_z2():
     variances = var_prior[draws]
     return np.random.normal(loc=means, scale=np.sqrt(variances))[:, dim_x:]
 
-prior_z2_dict = {i: generate_prior_z2() for i in range(factor_z2_samples)}
+# prior_z2_dict = {i: generate_prior_z2() for i in range(factor_z2_samples)}
 
 
 def generate_posterior_z1():
-    _, _, _, z = vade.VaDE(torch.from_numpy(df_obs.values).float())
+    vade.VaDE.eval()
+    with torch.no_grad():
+        _, _, _, z = vade.VaDE.forward(torch.from_numpy(df_obs.values).float())
     z1 = z[:,:latent_dim_x]
     return z1.detach().numpy()
 
-posterior_z1_dict = {i: generate_posterior_z1() for i in range(z1_samples)}
+# posterior_z1_dict = {i: generate_posterior_z1() for i in range(z1_samples)}
 
 
 # feed through model
@@ -251,7 +330,9 @@ for i_post_z1 in range(z1_samples):
         prior_z2 = generate_prior_z2()
         
         input_to_decoder = torch.cat((torch.from_numpy(posterior_z1), torch.from_numpy(prior_z2).float()), axis = 1)
-        xy_decode_deconf = vade.VaDE.decode(input_to_decoder)
+        vade.VaDE.eval()
+        with torch.no_grad():
+            xy_decode_deconf = vade.VaDE.decode(input_to_decoder)
         
         xy_decode_deconf = pd.DataFrame(xy_decode_deconf.detach().numpy())
 
@@ -305,7 +386,9 @@ prior_z = np.random.normal(loc=means, scale=np.sqrt(variances))
 
 
 # feed through model
-xy_decode_new_samples = vade.VaDE.decode(torch.from_numpy(prior_z).float())
+vade.VaDE.eval()
+with torch.no_grad():
+    xy_decode_new_samples = vade.VaDE.decode(torch.from_numpy(prior_z).float())
 xy_decode_new_samples = pd.DataFrame(xy_decode_new_samples.detach().numpy())
 
 
