@@ -48,13 +48,6 @@ class VaDE(torch.nn.Module):
             print(f'encode x: {x}, {x.shape}')
             print(f'encode y: {y}, {y.shape}')    
         
-        # estimate a mu_x1 and log_var_x1 (using GMM), but pass x1 thru at the same time
-        # gmm_x1 = GaussianMixture(n_components=x1.shape[1], covariance_type='diag') # !!! doublecheck whether n_classes is correct here
-        # gmm_x1.fit(x1.clone().cpu().detach().numpy())
-        # mu_x1 = torch.from_numpy(gmm_x1.means_).float().to(device)
-        # log_var_x1 = torch.log(torch.from_numpy(gmm_x1.covariances_)).float().to(device)        
-        # print(f'encode: mu_x1  {mu_x1}, {mu_x1.shape}')    
-        # print(f'encode: log_var_x1  {log_var_x1}, {log_var_x1.shape}')    
         
         hx = F.relu(self.fc1x(x))
         hx = F.relu(self.fc2x(hx))
@@ -90,8 +83,9 @@ class VaDE(torch.nn.Module):
         hy = F.relu(self.fc4y(z)) # the whole z vector is mapped to y
         hy = F.relu(self.fc5y(hy))
         hy = F.relu(self.fc6y(hy))
-        # return torch.cat((self.fc7x(hx), self.fc7y(hy)), dim = 1)
-        return torch.sigmoid(torch.cat((self.fc7x(hx), self.fc7y(hy)), dim = 1))
+        return torch.cat((self.fc7x(hx), self.fc7y(hy)), dim = 1)
+        # return torch.sigmoid(torch.cat((self.fc7x(hx), self.fc7y(hy)), dim = 1))
+
 
     def reparameterize(self, mu, log_var):
         std = torch.exp(log_var/2)

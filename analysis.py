@@ -15,33 +15,31 @@ scaler = MinMaxScaler(feature_range=(0, 1))
 def fn_plot_hist_by_X(data, snippet):
     # data must be n x 2 data frame, first column: X, second column Y
     
-
     # Generate labels like "1 (low X)" to "10 (high X)"
     bin_labels = [f"{i+1} {'(low X)' if i == 0 else ('(high X)' if i == 9 else '')}" for i in range(10)]
     
-    # Discretize the 'X' column into 10 bins and capture the bin edges
-    data['g'] = pd.cut(data['X'], bins=10, labels=bin_labels)
-    
-    # Reorder the categories of 'g' column to reverse the plot order
-    data['g'] = data['g'].cat.reorder_categories(bin_labels[::-1], ordered=True)
-    
-    import matplotlib.pyplot as plt
+    # Define bin edges
+    bin_edges = np.array([10, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0])
     
     # Setting up the figure and axes
     fig, axs = plt.subplots(10, 1, figsize=(10, 20), sharex=True)
     
-    # Get the unique values in 'g' to loop through
-    g_values = data['g'].cat.categories
+    colors = sns.color_palette("cubehelix", 10)
     
-    # Loop through each unique value in 'g' and plot on a separate axis
-    for i, g_val in enumerate(g_values):
-        subset = data[data['g'] == g_val]
-        axs[i].hist(subset['Y'], bins=30, color=sns.color_palette("cubehelix", 10)[i], edgecolor='black')
-        axs[i].set_title(f'{g_val}')
-        axs[i].set_ylabel('Frequency')
-    
+    # Loop through each bin to plot the histograms
+    for i in range(10):
+        upper_bin_edge = bin_edges[i]
+        lower_bin_edge = bin_edges[i+1]
+        subset = data[(data['X'] >= lower_bin_edge) & (data['X'] < upper_bin_edge)]
+        axs[i].hist(subset['Y'], bins=30, color=colors[i], edgecolor='black')
+        axs[i].set_title(bin_labels[i])
+        axs[i].set_ylabel('Frequency')  
+        axs[i].set_title(f"Bin {i+1} ({lower_bin_edge:.2f} <= X < {upper_bin_edge:.2f})")
+
+        
     # Set a common x-label
     axs[-1].set_xlabel('Y Value')
+    axs[-1].set_xlim([-.2, 1.2])
     
     
     # Add overall title to the figure
@@ -54,6 +52,44 @@ def fn_plot_hist_by_X(data, snippet):
     plt.savefig(plot_folder + "model" + time_str + "hist_deconf_" + snippet + ".pdf", bbox_inches='tight', dpi = 100)
 
 
+def fn_plot_hist_by_X_multiple(df_dict, time_str, snippet, density = True):
+    # Generate labels like "1 (low X)" to "10 (high X)"
+    bin_labels = [f"{i+1} {'(low X)' if i == 0 else ('(high X)' if i == 9 else '')}" for i in range(10)]
+    
+    # Setting up the figure and axes
+    fig, axs = plt.subplots(10, 1, figsize=(10, 20), sharex=True)
+    
+    # Assuming all DataFrames in df_dict have the same range of 'X', using the first one to get bin edges
+    # _, bin_edges = pd.cut(df_dict[list(df_dict.keys())[0]]['X'], bins=10, retbins=True)
+    bin_edges = np.array([10, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1, 0])
+    # Colors (you can adjust this if you have more than 10 datasets in df_dict)
+    colors = sns.color_palette("tab10", len(df_dict))
+    
+    # Loop through each bin to plot the histograms
+    for i in range(10):
+        upper_bin_edge = bin_edges[i]
+        lower_bin_edge = bin_edges[i+1]
+        
+        for j, (key, df) in enumerate(df_dict.items()):
+            subset = df[(df['X'] >= lower_bin_edge) & (df['X'] < upper_bin_edge)]
+            axs[i].hist(subset['Y'], bins=30, color=colors[j], alpha=0.5, edgecolor='black', label=key, density=density)
+            axs[i].set_title(f"Bin {i+1} ({lower_bin_edge:.2f} <= X < {upper_bin_edge:.2f})")
+            axs[i].set_ylabel('Density' if density == True else "Frequency")
+            if i == 0:
+                axs[i].legend()
+    
+    # Set a common x-label and x-limits
+    axs[-1].set_xlabel('Y Value')
+    axs[-1].set_xlim([-.2, 1.2])
+    
+    # Adjust layout
+    plt.tight_layout()
+    fig.suptitle("Hist by X Bins", y=1.02)
+    
+    # Save the figure
+    snippet = snippet + "_dens" if density == True else "_freq" 
+    plt.savefig(plot_folder + "model" + time_str + "_histogram_" + snippet + ".pdf", bbox_inches='tight', dpi=100)
+
 
 
 # Load the scaler from the saved file
@@ -61,29 +97,30 @@ with open('scaler.pkl', 'rb') as f:
     loaded_scaler = pickle.load(f)
 
 
-
+# load original data
 df_org = pd.read_csv('toy_data.csv')
-
-fn_plot_hist_by_X(pd.DataFrame(df_org[["X1", "Y"]]).rename(columns={"X1":"X"}), "orginal_data_confounded")
-    # data must be n x 2 data frame, first column: X, second column Y
-
-fn_plot_hist_by_X(pd.DataFrame(df_org[["X1", "Yint"]]).rename(columns={"X1":"X", "Yint": 'Y'}), "true_interventional")
-
 
 
 # Get all columns that start with 'X'
 x_cols = [col for col in df_org.columns if col.startswith('X')]
 
+# create observed data dataframe
 df_obs = df_org[x_cols + ['Y']]
 
+# scale the observed data (as is done in the get_toy_data dataloader)
 df_obs_sc = df_obs
 df_obs_sc[["X1", "Y"]] = scaler.fit_transform(df_obs_sc[["X1", "Y"]])
-
-
+# plot
 fn_plot_hist_by_X(pd.DataFrame(df_obs_sc.rename(columns={"X1":"X"})), "orginal_data_confounded")
-    # data must be n x 2 data frame, first column: X, second column Y
 
-fn_plot_hist_by_X(pd.DataFrame(df_org[["X1", "Yint"]]).rename(columns={"X1":"X", "Yint": 'Y'}), "true_interventional")
+
+# scale the true interventional Yint using the same scaler that is used in get_toy_data dataloader
+df_org_sc = df_org[["X1", "Yint"]]
+df_org_sc[["X1", "Yint"]] = loaded_scaler.transform(df_org_sc[["X1", "Yint"]])
+# plot
+df_org_int_plot = pd.DataFrame(df_org_sc[["X1", "Yint"]]).rename(columns={"X1":"X", "Yint": 'Y'})
+if dim_x == 1: fn_plot_hist_by_X(df_org_int_plot, "true_interventional")
+
 
 
 # feed through model
@@ -182,19 +219,12 @@ plt.scatter(t1[indices], t2.detach().numpy()[indices], c = 'red')
 #%% pairplots
 # are Z1 and Z2 dependent?
 
-## this HSIC implementation is not working, test statistic scales with number of observations!!
-
+## hsic_gam_torch HSIC implementation is not working, test statistic scales with number of observations!!
 # nest step, try this: https://github.com/Black-Swan-ICL/PyRKHSstats/tree/main
-
 # hsic_gam_torch(torch.from_numpy(z1), torch.from_numpy(z2))
-
 # hsic_gam_torch(torch.from_numpy(z1[1:100]), torch.from_numpy(z2[1:100]))
-
 # hsic_gam_torch(torch.from_numpy(z1[1:10]), torch.from_numpy(z2[1:10]))
-
-
 # testStat, thresh = hsic_gam(torch.from_numpy(z1), torch.from_numpy(z2), alph = 0.05)
-## this is computing a test stat but it doesnt produce a p value....
 
 df_obs_z = pd.concat((pd.DataFrame(df_obs), pd.DataFrame(z)), axis = 1)
 
@@ -214,14 +244,6 @@ sns.pairplot(df_xy_xyhat)
 plt.savefig(plot_folder + "model_" + time_str  + "_pairplot.pdf", bbox_inches='tight', dpi = 100)
 
 
-# # X, Y against Xhat, Yhat - but rescale everthing first
-# df_xy_xyhat_sc = pd.concat((pd.DataFrame(loaded_scaler.transform(df_obs)), pd.DataFrame(loaded_scaler.transform(xy_hat))), axis = 1)
-# df_xy_xyhat_sc.columns = ["X"+str(i+1) for i in range(dim_x)] + ["Y"] + ["Xhat"+str(i+1) for i in range(dim_x)] + ["Yhat"]
-# sns.pairplot(df_xy_xyhat_sc)
-
-
-# # Save the figure
-# plt.savefig(plot_folder + "model_" + time_str  + "_pairplot_sc.pdf", bbox_inches='tight', dpi = 100)
 
 #%%% run regressions
 
@@ -267,6 +289,8 @@ print(model3.summary())
 
 
 #%% deconfound
+
+# get pi_c and mu, var of latent from the vade model
 vade.VaDE.eval()
 with torch.no_grad():
     pi_c = vade.VaDE.pi_prior.detach().numpy()
@@ -302,24 +326,18 @@ xy_decode_deconf_one_shot = pd.DataFrame(xy_decode_deconf_one_shot.detach().nump
 fn_plot_hist_by_X(pd.DataFrame(xy_decode_deconf_one_shot).rename(columns={0:"X", 1:"Y"}), "deconfounding_by_using_prior_Z2_one_shot")
 
 ##############################################################################################################
-# 2: sample new data, use observed X, ie. use Z1|X but sample Z2 from its prior
+# 2: deconfound using Z1|X and sampling Z2 from its prior
 ##############################################################################################################
 # prior for Z2
 # draw from categorical with proba pi_c
-z1_samples = 50
-z2_samples = 100# how many more samples from prior z2 do we want for each obs from posterior z1
-# no_draws = z1.shape[0] * factor_z2_samples
+z1_samples = 10
+z2_samples = 100 # z2 samples per z1 sample
 
-
-# !!! question: dont I need to take the dependence between Z1 and Z2 into account here
-# shouldnt I use pi_c_conditional on x or conditional on z here?
 def generate_prior_z2():
     draws = np.random.choice(np.arange(len(pi_c)), size=z1.shape[0], p=pi_c)
     means = mu_prior[draws]
     variances = var_prior[draws]
     return np.random.normal(loc=means, scale=np.sqrt(variances))[:, dim_x:]
-
-# prior_z2_dict = {i: generate_prior_z2() for i in range(factor_z2_samples)}
 
 
 def generate_posterior_z1():
@@ -328,8 +346,6 @@ def generate_posterior_z1():
         _, _, _, z = vade.VaDE.forward(torch.from_numpy(df_obs_sc.values).float())
     z1 = z[:,:latent_dim_x]
     return z1.detach().numpy()
-
-# posterior_z1_dict = {i: generate_posterior_z1() for i in range(z1_samples)}
 
 
 # feed through model
@@ -355,7 +371,7 @@ for i_post_z1 in range(z1_samples):
 
         
         # First column remains the same
-        x_part = xy_decode_deconf_np[:, :dim_x]  # Taking every factor_z2_samples-th value from the 1st column
+        x_part = xy_decode_deconf_np[:, :dim_x] # Taking every factor_z2_samples-th value from the 1st column
 
         # For the second column, reshape and then compute the mean along axis 1
         y_part = xy_decode_deconf_np[:, -1:]#.reshape(factor_z2_samples, posterior_z1_x.shape[0])
@@ -368,18 +384,10 @@ for i_post_z1 in range(z1_samples):
 
 reshaped_draws = np.array(all_draws).reshape(-1, 2)
 
-
-
 dfplot = pd.DataFrame(reshaped_draws).rename(columns = {0: "X", 1: "Y"})
 
-if dim_x == 1: fn_plot_hist_by_X(dfplot, "deconfounding_by_using_prior_Z2")
+if dim_x == 1: fn_plot_hist_by_X(dfplot.copy(), "deconfounding_by_using_prior_Z2")
 
-
-### !!! compute MSE function
-
-
-
-print(dfplot.groupby('g').describe())
 
 ##############################################################################################################
 # 3: sample new data, sample Z1 and Z2 from their priors
@@ -404,70 +412,83 @@ with torch.no_grad():
 xy_decode_new_samples = pd.DataFrame(xy_decode_new_samples.detach().numpy())
 
 
-
 fn_plot_hist_by_X(pd.DataFrame(xy_decode_new_samples).rename(columns={0:"X", 1:"Y"}), "both_Z1_and_Z2_from_priors")
 
 
+##############################################################################################################
+#### make plots
+##############################################################################################################
+
+df_dict = {"true_interventional": df_org_int_plot, 
+           "deconfounding_by_using_prior_Z2": dfplot,
+           "orginal_data_confounded": pd.DataFrame(df_obs_sc.rename(columns={"X1":"X"}))}
+fn_plot_hist_by_X_multiple(df_dict, time_str, snippet="both_interv", density = True)
 
 
-#%%
-# Get the number of 'X' columns
-xdim = len([col for col in df_obs.columns if col.startswith('X')])
-
-# Create a list of new column names
-new_columns = [f'X{i+1}hat' for i in range(xdim)] + ['Yhat']
-
-# Rename the columns
-xy_decode.columns = new_columns
-# run regression
-
-# Add a constant to the independent values
-X = sm.add_constant(xy_decode[[c + "hat" for c in x_cols]])
-
-# Fit the model
-modelz = sm.OLS(xy_decode['Yhat'], X).fit()
-
-print(modelz.summary())
-
-# sns.histplot(xy_decode[,2])
-# sns.histplot(y_decode.detach().numpy()[:,2])
-# sns.histplot(yhat[:,0])
-# sns.pairplot(xy_decode)
-
-df_org_decode = pd.concat((df_obs, xy_decode), axis = 1)
-
-sns.pairplot(df_org_decode)
+df_dict = {"both_Z1_and_Z2_from_priors": pd.DataFrame(xy_decode_new_samples).rename(columns={0:"X", 1:"Y"}),
+           "orginal_data_confounded": pd.DataFrame(df_obs_sc.rename(columns={"X1":"X"}))}
+fn_plot_hist_by_X_multiple(df_dict, time_str, snippet="orig_and_new_data", density = True)
 
 
-# plot three histograms in one plot
-# 1: observational distribution of Y: df_obs["Y"]
-# 2: true interventiaonal distribution of Y: df_Yint["Yint"]
-# 3: estimated interventional distribution of Y: xy_decode['Yhat']
+
+#%% snippets following
+# # Get the number of 'X' columns
+# xdim = len([col for col in df_obs.columns if col.startswith('X')])
+
+# # Create a list of new column names
+# new_columns = [f'X{i+1}hat' for i in range(xdim)] + ['Yhat']
+
+# # Rename the columns
+# xy_decode.columns = new_columns
+# # run regression
+
+# # Add a constant to the independent values
+# X = sm.add_constant(xy_decode[[c + "hat" for c in x_cols]])
+
+# # Fit the model
+# modelz = sm.OLS(xy_decode['Yhat'], X).fit()
+
+# print(modelz.summary())
+
+# # sns.histplot(xy_decode[,2])
+# # sns.histplot(y_decode.detach().numpy()[:,2])
+# # sns.histplot(yhat[:,0])
+# # sns.pairplot(xy_decode)
+
+# df_org_decode = pd.concat((df_obs, xy_decode), axis = 1)
+
+# sns.pairplot(df_org_decode)
 
 
-fig, axs = plt.subplots(3, 1, sharex=True, sharey=True)
-
-# Plot the observational distribution of Y
-axs[0].hist(df_obs["Y"], bins=30, alpha=0.5)
-axs[0].set_title('Observational')
-
-# Plot the true interventional distribution of Y
-axs[1].hist(df_org["Yint"], bins=30, alpha=0.5)
-axs[1].set_title('True Interventional')
-
-# Plot the estimated interventional distribution of Y
-axs[2].hist(xy_decode['Yhat'], bins=30, alpha=0.5)
-axs[2].set_title('Estimated Interventional')
-axs[2].set_xlabel('Y')
+# # plot three histograms in one plot
+# # 1: observational distribution of Y: df_obs["Y"]
+# # 2: true interventiaonal distribution of Y: df_Yint["Yint"]
+# # 3: estimated interventional distribution of Y: xy_decode['Yhat']
 
 
-# Adjust the spacing between subplots
-plt.subplots_adjust(hspace=0.5)
+# fig, axs = plt.subplots(3, 1, sharex=True, sharey=True)
 
-plt.show()
-fig.savefig(plot_folder + "model_" + time_str  + "_Yhistograms.pdf", 
-            bbox_inches='tight',
-            dpi = 333)   # save the figure to file     
+# # Plot the observational distribution of Y
+# axs[0].hist(df_obs["Y"], bins=30, alpha=0.5)
+# axs[0].set_title('Observational')
+
+# # Plot the true interventional distribution of Y
+# axs[1].hist(df_org["Yint"], bins=30, alpha=0.5)
+# axs[1].set_title('True Interventional')
+
+# # Plot the estimated interventional distribution of Y
+# axs[2].hist(xy_decode['Yhat'], bins=30, alpha=0.5)
+# axs[2].set_title('Estimated Interventional')
+# axs[2].set_xlabel('Y')
+
+
+# # Adjust the spacing between subplots
+# plt.subplots_adjust(hspace=0.5)
+
+# plt.show()
+# fig.savefig(plot_folder + "model_" + time_str  + "_Yhistograms.pdf", 
+#             bbox_inches='tight',
+#             dpi = 333)   # save the figure to file     
 
 
 #%% conditional interventional distribution

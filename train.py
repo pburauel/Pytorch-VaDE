@@ -201,9 +201,8 @@ class TrainerVaDE:
 
     def compute_loss(self, xy, xy_hat, mu, log_var, z, epoch, true_label):
         no_epochs = self.args.epochs
-        weight = self.compute_weight(no_epochs, epoch)
-        weight2 = self.compute_weight2(no_epochs, epoch)
         weights = self.compute_weights(no_epochs, epoch, no_weights = 3)
+        weights_2only = self.compute_2_weights(no_epochs, epoch)
         x = xy[:, :dim_x] # selects the first dim_x columns
         y = xy[:, dim_x:] # selects the remaining columns
         x_hat = xy_hat[:, :dim_x] # selects the first dim_x columns
@@ -228,18 +227,22 @@ class TrainerVaDE:
             # print(f'epoch is {epoch} of {no_epochs}, weight is {weight}')
             
         # log_p_x_given_z = F.binary_cross_entropy(x_hat, x, reduction='sum') 
-        mse_x = F.binary_cross_entropy(x_hat, x, reduction='sum') 
-        mse_y = F.binary_cross_entropy(y_hat, y, reduction='sum') 
-        # mse_x = F.mse_loss(x_hat, x, reduction='sum')
-        # mse_y = F.mse_loss(y_hat, y, reduction='sum') # used to be called log_p_x_given_z 
+        # mse_x = F.binary_cross_entropy(x_hat, x, reduction='sum') 
+        # mse_y = F.binary_cross_entropy(y_hat, y, reduction='sum') 
+        mse_x = F.mse_loss(x_hat, x, reduction='sum')
+        mse_y = F.mse_loss(y_hat, y, reduction='sum') # used to be called log_p_x_given_z 
         h = log_var.exp().unsqueeze(1) + (mu.unsqueeze(1) - self.VaDE.mu_prior).pow(2) # mu here needs the same dimensionality as VaDE.mu_prior
         h = torch.sum(self.VaDE.log_var_prior + h / self.VaDE.log_var_prior.exp(), dim=2) # obs x n_classes x latent_dim
         log_p_z_given_c = 0.5 * torch.sum(gamma * h) # ok, see eq. B --- SCALAR
         log_p_c = torch.sum(gamma * torch.log(p_c/p_c.sum() + 1e-9)) # ok, see eq. C in Appendix -- added the division by p_c sum here because p_c is not constrained to add up to 1 -- this is not important for compute_gamma because compute_gamma(z, p_c) = compute_gamma(z, p_c * constant)
         log_q_c_given_x = torch.sum(gamma * torch.log(gamma + 1e-9)) # eq. E in Appendix
         log_q_z_given_x = -0.5 * torch.sum(1 + log_var) # ok, see eq. D in App., added a minus sign here and changed the sign for this component in the overall loss (original code is fine, this is just for better readability)
-
+        
+        # regularisation = log_p_z_given_c - log_p_c + log_q_c_given_x + log_q_z_given_x
+        # reconstruction = 1000 * mse_x + 1000 * weights_2only[0] * mse_y   # changed the signs, 
+        # loss = reconstruction + self.args.weight_regulariser * weights_2only[1] * regularisation
         loss = 1000 * mse_x + 1000 * weights[1] * mse_y + weights[2] * log_p_z_given_c - weights[2] * log_p_c + weights[2] * log_q_c_given_x + weights[2] * log_q_z_given_x # changed the signs, 
+
         # loss = mse_x + weights[1] * mse_y #- weight* log_p_c #+ weight * log_p_z_given_c #+ log_q_c_given_x + log_q_z_given_x # changed the signs, 
         # loss = loss - weights[2] * log_p_c + weights[3] * log_p_z_given_c + weights[6] * log_q_c_given_x 
         # loss = mse_x +  weights[1] * mse_y +  weights[2] * log_p_z_given_c -  weights[3] * log_p_c +  weights[4] * log_q_c_given_x +  weights[5] *  log_q_z_given_x
@@ -265,31 +268,29 @@ class TrainerVaDE:
                           'gamma_pred' : torch.argmax(gamma, dim=1)}
         return loss, loss_components, training_stats
     
-
-
-    def compute_weight(self, no_epochs, epoch):
-        if epoch < no_epochs * 2 / 8:
-            weight = 0
-        elif epoch < no_epochs * 4 / 8:
-            weight = (epoch - no_epochs * 2 / 8) / (no_epochs * 2 / 8)
-        else:
-            weight = 1
-        return weight
-        # if epoch < no_epochs / 4:
-        #     weight = 0
-        # elif epoch < no_epochs * 3 / 4:
-        #     weight = 2 * (epoch - no_epochs / 4) / no_epochs
-        # else:
-        #     weight = 1
-        # return weight
-    def compute_weight2(self, epoch, no_epochs):
-        if epoch < no_epochs * 4 / 8:
-            weight = 0
-        elif epoch < no_epochs * 6 / 8:
-            weight = (epoch - no_epochs * 4 / 8) / (no_epochs * 2 / 8)
-        else:
-            weight = 1
-        return weight
+    # def compute_weight(self, no_epochs, epoch):
+    #     if epoch < no_epochs * 2 / 8:
+    #         weight = 0
+    #     elif epoch < no_epochs * 4 / 8:
+    #         weight = (epoch - no_epochs * 2 / 8) / (no_epochs * 2 / 8)
+    #     else:
+    #         weight = 1
+    #     return weight
+    #     # if epoch < no_epochs / 4:
+    #     #     weight = 0
+    #     # elif epoch < no_epochs * 3 / 4:
+    #     #     weight = 2 * (epoch - no_epochs / 4) / no_epochs
+    #     # else:
+    #     #     weight = 1
+    #     # return weight
+    # def compute_weight2(self, epoch, no_epochs):
+    #     if epoch < no_epochs * 4 / 8:
+    #         weight = 0
+    #     elif epoch < no_epochs * 6 / 8:
+    #         weight = (epoch - no_epochs * 4 / 8) / (no_epochs * 2 / 8)
+    #     else:
+    #         weight = 1
+    #     return weight
 
     def compute_weights(self, epoch, no_epochs, no_weights):
         weights = [0] * no_weights
@@ -308,7 +309,28 @@ class TrainerVaDE:
 
         return weights
 
-
+    def compute_2_weights(self, epoch, no_epochs):
+        weights = [0, 0]
+    
+        # Interval length for the weights
+        interval_length = no_epochs / 3
+    
+        # For the first weight
+        if epoch < interval_length:
+            weights[0] = epoch / interval_length
+        else:
+            weights[0] = 1
+    
+        # For the second weight
+        if epoch < interval_length:
+            weights[1] = 0
+        elif epoch < 2 * interval_length:
+            weights[1] = (epoch - interval_length) / interval_length
+        else:
+            weights[1] = 1
+    
+        return weights
+    
     def compute_gamma(self, z, p_c):
         # print(f'compute gamma: shape of z {z.shape}')
         # print(f'compute gamma: shape of p_c {p_c.shape}')
