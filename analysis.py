@@ -8,6 +8,9 @@ import pickle
 from hsic_torch import *
 # how to get the model params out?
 
+from sklearn.preprocessing import MinMaxScaler
+scaler = MinMaxScaler(feature_range=(0, 1))
+
 
 def fn_plot_hist_by_X(data, snippet):
     # data must be n x 2 data frame, first column: X, second column Y
@@ -72,6 +75,15 @@ fn_plot_hist_by_X(pd.DataFrame(df_org[["X1", "Yint"]]).rename(columns={"X1":"X",
 x_cols = [col for col in df_org.columns if col.startswith('X')]
 
 df_obs = df_org[x_cols + ['Y']]
+
+df_obs_sc = df_obs
+df_obs_sc[["X1", "Y"]] = scaler.fit_transform(df_obs_sc[["X1", "Y"]])
+
+
+fn_plot_hist_by_X(pd.DataFrame(df_obs_sc.rename(columns={"X1":"X"})), "orginal_data_confounded")
+    # data must be n x 2 data frame, first column: X, second column Y
+
+fn_plot_hist_by_X(pd.DataFrame(df_org[["X1", "Yint"]]).rename(columns={"X1":"X", "Yint": 'Y'}), "true_interventional")
 
 
 # feed through model
@@ -258,7 +270,7 @@ print(model3.summary())
 vade.VaDE.eval()
 with torch.no_grad():
     pi_c = vade.VaDE.pi_prior.detach().numpy()
-    pi_c = np.clip(pi_c, a_min = 0, a_max = pi_c.max())
+    pi_c = np.exp(pi_c)#, a_min = 0, a_max = pi_c.max())    
     pi_c = pi_c/pi_c.sum()
     mu_prior = vade.VaDE.mu_prior.detach().numpy() # size #C x #L
     log_var_prior = vade.VaDE.log_var_prior.detach().numpy()
@@ -313,7 +325,7 @@ def generate_prior_z2():
 def generate_posterior_z1():
     vade.VaDE.eval()
     with torch.no_grad():
-        _, _, _, z = vade.VaDE.forward(torch.from_numpy(df_obs.values).float())
+        _, _, _, z = vade.VaDE.forward(torch.from_numpy(df_obs_sc.values).float())
     z1 = z[:,:latent_dim_x]
     return z1.detach().numpy()
 
@@ -339,7 +351,7 @@ for i_post_z1 in range(z1_samples):
         # Convert the decoded results back to numpy for processing
         xy_decode_deconf_np = xy_decode_deconf.to_numpy()
         # invert scaling
-        xy_decode_deconf_np = loaded_scaler.inverse_transform(xy_decode_deconf_np)
+        # xy_decode_deconf_np = loaded_scaler.inverse_transform(xy_decode_deconf_np)
 
         
         # First column remains the same
